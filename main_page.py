@@ -5,54 +5,61 @@ import random
 
 st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
 
-st.title("Dr. Kodhek : Type-2 Diabetes Management Optimal Care")
+st.title("Type-2 Diabetes Management Optimal Care")
+st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
 st.write("A comprehensive medical tool for management of type-2 diabetes")
 
 st.divider()
-df = pd.DataFrame(
-    {
-        "name": ["Patient I", "Patient II", "Patient III"],
-        "url": ["https://roadmap.streamlit.app", "https://extras.streamlit.app", "https://issues.streamlit.app"],
-        "stars": [random.randint(0, 1000) for _ in range(3)],
-        "views_history": [[random.randint(0, 5000) for _ in range(30)] for _ in range(3)],
-    }
-)
-st.dataframe(
-    df,
-    column_config={
-        "name": "Patient name",
-        "stars": st.column_config.NumberColumn(
-            "MPC Scores",
-            help="Number of stars on GitHub",
-            format="%d ⭐",
-        ),
-        "url": st.column_config.LinkColumn("Link"),
-        "views_history": st.column_config.LineChartColumn(
-            "Blood glucose (past 30 days)", y_min=0, y_max=5000
-        ),
-    },
-    hide_index=True,
-)
+st.header("SCORING OF THE ELEMENTS")
 st.divider()
+st.subheader("1.BGM (Each visit outcome measure)")
+scale = st.radio(
+    "Meaurement type",
+    ["FBG", "RBS"],
+    index=None,
+)
+mmol = st.number_input("mmol/lit:")
+result = ''
+if st.button('Calculate BGM'):
+    if scale=='FBG':
+       if mmol >= 3.9 and mmol <= 5.5:
+        result = 'Optimal'
+        st.success(result)
+       if mmol >= 5.6 and mmol <= 7.9:
+        result = 'Normal'
+        st.info(result)
+       if mmol >= 8 and mmol <= 9:
+        result = 'Elevated'
+        st.warning(result)        
+       if ((mmol >= 9.1 and mmol <= 10.4) or (mmol >= 3 and mmol <= 3.8)):
+        result = 'High/grade 1 hypo'
+        st.error(result)
+       if mmol > 10 and mmol < 3:
+        result = 'Very high/grade 2 hypo'
+        st.error(result)
+    if scale=='RBS':
+       if mmol >= 3.9 and mmol <= 6:
+        result = 'Optimal'
+        st.success(result)
+       if mmol >= 6.1 and mmol <= 6.9:
+        result = 'Normal'
+        st.info(result)
+       if mmol >= 7 and mmol <= 10:
+        result = 'Elevated' 
+        st.warning(result)
+       if mmol >= 10.1 and mmol <= 13.9:
+        result = 'High/grade 1 hypo'
+        st.error(result)
+       if mmol > 13.9:
+        result = 'Very high/grade 2 hypo'
+        st.error(result)
+    if not result:
+        st.error('You have not entered valid inputs, please try again')
+else:
+    scale = ''
+    mmol = 0
+    
 
-st.cache_data.clear()
-st.cache_resource.clear()
 
-# Create the SQL connection to patients as specified in your secrets file.
-conn = st.experimental_connection('patients_db', type='sql')
 
-# Insert some data with conn.session.
-with conn.session as s:
-    s.execute('CREATE TABLE IF NOT EXISTS pet_owners (person TEXT, pet TEXT);')
-    s.execute('DELETE FROM pet_owners;')
-    pet_owners = {'jerry': 'fish', 'barbara': 'cat', 'alex': 'puppy'}
-    for k in pet_owners:
-        s.execute(
-            'INSERT INTO pet_owners (person, pet) VALUES (:owner, :pet);',
-            params=dict(owner=k, pet=pet_owners[k])
-        )
-    s.commit()
 
-# Query and display the data you inserted
-pet_owners = conn.query('select * from pet_owners')
-st.dataframe(pet_owners)
