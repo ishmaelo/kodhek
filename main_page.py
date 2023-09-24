@@ -35,6 +35,9 @@ st.dataframe(
 )
 st.divider()
 
+st.cache_data.clear()
+st.cache_resource.clear()
+
 # Create the SQL connection to patients as specified in your secrets file.
 conn = st.experimental_connection('patients_db', type='sql')
 
