@@ -11,7 +11,7 @@ st.title("Type-2 Diabetes Management Optimal Care")
 st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
 st.write("A comprehensive medical tool for management of type-2 diabetes")
 
-st.markdown("Home page")
+st.markdown("Patient Data Capture")
 
 
 st.divider()
