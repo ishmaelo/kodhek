@@ -7,6 +7,9 @@ import random
 
 st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
 
+st.title("Type-2 Diabetes Management Optimal Care")
+st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
+
 st.sidebar.title("Type-2 Diabetes Management Optimal Care")
 st.sidebar.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
 st.sidebar.write("A comprehensive medical tool for management of type-2 diabetes")
