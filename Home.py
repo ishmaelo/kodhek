@@ -11,7 +11,12 @@ st.title("Type-2 Diabetes Management Optimal Care")
 st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
 st.write("A comprehensive medical tool for management of type-2 diabetes")
 
-st.markdown("Patient Data Capture")
+
+chart_data = pd.DataFrame(
+     np.random.randn(20, 3),
+     columns=['Patient 1', 'Patient 2', 'Patient 3'])
+
+st.line_chart(chart_data)
 
 
 st.divider()
