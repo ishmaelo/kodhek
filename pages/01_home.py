@@ -3,7 +3,8 @@ import pandas as pd
 import numpy as np
 import random
 
-
+st.markdown("Home page")
+st.sidebar.markdown("Home page display")
 
 st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
 
