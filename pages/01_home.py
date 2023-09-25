@@ -12,7 +12,7 @@ st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics "
 st.write("A comprehensive medical tool for management of type-2 diabetes")
 
 st.markdown("Home page")
-st.sidebar.markdown("Home page display")
+
 
 st.divider()
 st.header("SCORING OF THE ELEMENTS")
