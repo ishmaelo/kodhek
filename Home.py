@@ -5,7 +5,7 @@ import random
 
 
 
-st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
+st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal Care', layout = 'wide', initial_sidebar_state = 'auto')
 
 st.title("Type-2 Diabetes Management Optimal Care")
 st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
