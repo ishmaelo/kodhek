@@ -89,5 +89,22 @@ else:
     mpc = ''
     score = ''
 
+'''
+Working with databases
+'''
 
+import streamlit as st
+import sqlite3
 
+# Create a connection to the SQLite database
+conn = sqlite3.connect('my_database.sqlite')
+
+# Execute a SQL query
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM users')
+
+# Get the results of the query
+users = cursor.fetchall()
+
+# Display the results in Streamlit
+st.dataframe(users)
