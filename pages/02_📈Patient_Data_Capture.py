@@ -92,6 +92,7 @@ else:
 '''
 Working with databases
 '''
+st.write('Working with Databases')
 
 import streamlit as st
 import sqlite3
