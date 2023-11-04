@@ -89,9 +89,9 @@ else:
     mpc = ''
     score = ''
 
-'''
-Working with databases
-'''
+
+# == Working with databases ==
+
 st.write('Working with Databases')
 
 import streamlit as st
@@ -107,5 +107,36 @@ cursor.execute('SELECT * FROM biodata')
 # Get the results of the query
 users = cursor.fetchall()
 
+
+
+st.divider()
+
+st.subheader('Adding patient records')
+
 # Display the results in Streamlit
 st.dataframe(users)
+
+## Test saving of data to the db
+import time
+def get_connection_to_db():
+    return sqlite3.connect('db/patient.db')# <-- Replace with your db connection method
+
+connx = get_connection_to_db()
+
+def store_in_db(name,dob):
+    #st.write(data)  # <-- Replace with your db storage method e.g. conn.write(data)
+    connx.execute(f'''
+            INSERT INTO biodata (patient_name, date_of_birth) VALUES ('{name}','{dob}')
+            ''')
+    connx.commit()
+
+
+st.header("New patient")
+form = st.form(key="match")
+with form:
+    name = st.text_input("Patient name")
+    dob = st.text_input("Date of birth")
+    timestamp = time.time()
+    submit = st.form_submit_button("Submit")
+    if submit:
+        store_in_db(name,dob)
