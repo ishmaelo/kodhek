@@ -98,11 +98,11 @@ import streamlit as st
 import sqlite3
 
 # Create a connection to the SQLite database
-conn = sqlite3.connect('my_database.sqlite')
+conn = sqlite3.connect('db/patient.db')
 
 # Execute a SQL query
 cursor = conn.cursor()
-cursor.execute('SELECT * FROM users')
+cursor.execute('SELECT * FROM biodata')
 
 # Get the results of the query
 users = cursor.fetchall()
