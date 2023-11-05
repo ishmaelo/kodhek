@@ -114,7 +114,7 @@ st.divider()
 st.subheader('Adding patient records')
 
 # Display the results in Streamlit
-st.dataframe(users)
+st.table(users)
 
 ## Test saving of data to the db
 import time
