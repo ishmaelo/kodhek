@@ -125,10 +125,14 @@ def get_connection_to_db():
 
 connx = get_connection_to_db()
 
-def store_in_db(name,dob):
+def store_in_db(name,dob,sex,race,duration,residence,profession,monthly_income,subsistence_spending,pocket,non_sp_40):
     #st.write(data)  # <-- Replace with your db storage method e.g. conn.write(data)
     connx.execute(f'''
-            INSERT INTO biodata (patient_name, date_of_birth) VALUES ('{name}','{dob}')
+            INSERT INTO biodata (
+            patient_name, date_of_birth,sex,race,duration,residence,profession,monthly_income,subsistence_spending,pocket,non_sp_40
+            ) 
+            VALUES 
+            ('{name}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}')
             ''')
     connx.commit()
 
@@ -137,10 +141,19 @@ st.header("New patient")
 form = st.form(key="match")
 with form:
     name = st.text_input("Patient name")
-    dob = st.text_input("Date of birth")
+    dob = st.date_input("Date of birth")
     timestamp = time.time()
+    sex = st.radio("Sex",["Male", "Female"],index=None,) 
+    race = st.radio("Race",["Negroid/Black", "White/Caucasian", "Mongoloid/Asian","Australoid"],index=None,)
+    duration = st.text_input("Duration of T2DM (in years)")
+    residence = st.text_input("Residence")
+    profession = st.text_input("Profession")
+    monthly_income = st.text_input("Total monthly income (in KES)")
+    subsistence_spending = st.text_input("Total subsistence spending (in KES)")
+    pocket = st.text_input("Out of pocket monthly health expenditure (in KES)")
+    non_sp_40 = st.text_input("40% non SP (in KES)")
     submit = st.form_submit_button("Submit")
     if submit:
-        store_in_db(name,dob)
+        store_in_db(name,dob,sex,race,duration,residence,profession,monthly_income,subsistence_spending,pocket,non_sp_40)
         
         
