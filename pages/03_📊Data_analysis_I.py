@@ -30,7 +30,7 @@ def load_readings(patient_id):
     cursor=conn.cursor()
     cursor.execute(sql)
     df = pd.DataFrame(cursor.fetchall(),columns=['Reading date','Reading time','mmol/lit','MPC scale','MPC','Score','Description'])
-    print(df.count())
+    #print(df.count())
     
     if not df.empty:
        last_row = df.iloc[-1]
