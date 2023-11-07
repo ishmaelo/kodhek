@@ -114,7 +114,9 @@ st.divider()
 st.subheader('Adding patient records')
 
 # Display the results in Streamlit
-st.table(users)
+st.dataframe(users)
+
+
 
 ## Test saving of data to the db
 import time
@@ -140,3 +142,5 @@ with form:
     submit = st.form_submit_button("Submit")
     if submit:
         store_in_db(name,dob)
+        
+        

@@ -5,14 +5,14 @@ import random
 
 
 
-st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal Care', layout = 'wide', initial_sidebar_state = 'auto')
+st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal Care Menology', layout = 'wide', initial_sidebar_state = 'auto')
 
-st.title("Type-2 Diabetes Management Optimal Care")
-st.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
+st.title("T2DM Optimal Care Menology")
 
-st.sidebar.title("Type-2 Diabetes Management Optimal Care")
+
+st.sidebar.title("Management Performance Composite Score Tool for Type 2 Diabetes Melitus (MPCST)")
 st.sidebar.subheader("Author: Dr. Argwings Kodhek - PhD in Epidemiology and Biostatics ")
-st.sidebar.write("A comprehensive medical tool for management of type-2 diabetes")
+
 
 
 chart_data = pd.DataFrame(
