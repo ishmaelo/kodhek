@@ -31,6 +31,7 @@ def load_readings(patient_id):
     cursor.execute(sql)
     df = pd.DataFrame(cursor.fetchall(),columns=['Reading date','Reading time','mmol/lit','MPC scale','MPC','Score','Description'])
     print(df.count())
+    """
     if not df.empty:
        last_row = df.iloc[-1]
        last_mmlot = last_row['mmol/lit']
@@ -43,7 +44,7 @@ def load_readings(patient_id):
     df = df.drop('Reading time', axis=1)
     df = df.drop('Description', axis=1)
     df = df.drop('MPC scale', axis=1)
-   
+    """
     st.line_chart(df)
 
 
