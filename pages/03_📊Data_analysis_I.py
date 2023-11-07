@@ -30,12 +30,13 @@ def load_readings(patient_id):
     cursor=conn.cursor()
     cursor.execute(sql)
     df = pd.DataFrame(cursor.fetchall(),columns=['Reading date','Reading time','mmol/lit','MPC scale','MPC','Score','Description'])
-    last_row = df.iloc[-1]
-    last_mmlot = last_row['mmol/lit']
-    last2_row = df.iloc[-2]
-    last2_mmlot = last2_row['mmol/lit']
-    diff = last_mmlot - last2_mmlot
-    st.metric(label="FBG", value=str(last_mmlot) + " mmol/lit", delta = str(diff) + "mmol/lit")
+    if not df.empty:
+       last_row = df.iloc[-1]
+       last_mmlot = last_row['mmol/lit']
+       last2_row = df.iloc[-2]
+       last2_mmlot = last2_row['mmol/lit']
+       diff = last_mmlot - last2_mmlot
+       st.metric(label="FBG", value=str(last_mmlot) + " mmol/lit", delta = str(diff) + "mmol/lit")
     st.dataframe(df,use_container_width=True)
     df = df.drop('Reading date', axis=1)
     df = df.drop('Reading time', axis=1)
