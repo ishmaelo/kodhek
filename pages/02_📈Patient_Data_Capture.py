@@ -129,10 +129,10 @@ def store_in_db(name,dob,sex,race,duration,residence,profession,monthly_income,s
     #st.write(data)  # <-- Replace with your db storage method e.g. conn.write(data)
     connx.execute(f'''
             INSERT INTO biodata (
-            patient_name, date_of_birth,sex,race,duration,residence,profession,monthly_income,subsistence_spending,pocket,non_sp_40
+            patient_name, date_of_birth,sex,race,duration,residence,profession,monthly_income,subsistence_spending,out_of_pocket_spending,non_sp_40
             ) 
             VALUES 
-            ('{name}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}','{dob}')
+            ('{name}','{dob}','{sex}','{race}','{duration}','{residence}','{profession}','{monthly_income}','{subsistence_spending}','{pocket}','{non_sp_40}')
             ''')
     connx.commit()
 
