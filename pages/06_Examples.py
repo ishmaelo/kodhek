@@ -161,3 +161,54 @@ def make_clickable(url, name):
 
 df
 
+def line_graph_options():
+    import altair as alt
+    from vega_datasets import data
+
+
+    source = data.stocks()
+
+    base = alt.Chart(source).encode(
+        alt.Color("symbol").legend(None)
+    ).transform_filter(
+        "datum.symbol !== 'IBM'"
+    ).properties(
+        width=500
+    )
+
+    line = base.mark_line().encode(x="date", y="price")
+
+
+    last_price = base.mark_circle().encode(
+        alt.X("last_date['date']:T"),
+        alt.Y("last_date['price']:Q")
+    ).transform_aggregate(
+        last_date="argmax(date)",
+        groupby=["symbol"]
+    )
+
+    company_name = last_price.mark_text(align="left", dx=4).encode(text="symbol")
+
+    chart = (line + last_price + company_name).encode(
+        x=alt.X().title("date"),
+        y=alt.Y().title("price")
+    )
+
+    chart
+    
+    
+    import altair as alt
+    chart = (
+        alt.Chart(
+            data=df,
+            title="Your title",
+        )
+        .mark_line()
+        .encode(
+            x=alt.X("Reading date", axis=alt.Axis(title="BGM Reading date")),
+            y=alt.Y("Score", axis=alt.Axis(title="MPC Score")),
+        )
+    )
+
+    st.altair_chart(chart,use_container_width=True)
+
