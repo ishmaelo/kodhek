@@ -98,7 +98,7 @@ def load_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=1000
+        width=1100
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
@@ -138,7 +138,7 @@ def hba1c_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=500
+        width=1100
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
@@ -164,11 +164,11 @@ def bp_readings_with_chart(patient_id):
     st.divider()
     st.subheader("3.Blood Pressure Monitoring")
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_time,bgm,id, description,score FROM hba1c WHERE patient_id = '" + str(patient_id) + "'"
+    sql = "SELECT reading_date,dbp,sbp,score FROM bp_reading WHERE patient_id = '" + str(patient_id) + "'"
     cursor=conn.cursor()
     cursor.execute(sql)
     resultset = cursor.fetchall()
-    new_df = get_row_data_with_annotations(resultset)
+    new_df = get_bp_data_with_annotations(resultset)
     new_df['Reading date'] = pd.to_datetime(new_df['Reading date'])
     source = new_df
     source
@@ -178,7 +178,7 @@ def bp_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=500
+        width=1100
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
@@ -204,11 +204,11 @@ def lipid_readings_with_chart(patient_id):
     st.divider()
     st.subheader("4.Lipids (mmol/lit)")
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_time,bgm,id, description,score FROM hba1c WHERE patient_id = '" + str(patient_id) + "'"
+    sql = "SELECT reading_date,ldl,hdl,score FROM patient_lipid WHERE patient_id = '" + str(patient_id) + "'"
     cursor=conn.cursor()
     cursor.execute(sql)
     resultset = cursor.fetchall()
-    new_df = get_row_data_with_annotations(resultset)
+    new_df = get_lipid_data_with_annotations(resultset)
     new_df['Reading date'] = pd.to_datetime(new_df['Reading date'])
     source = new_df
     source
@@ -218,7 +218,7 @@ def lipid_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=500
+        width=1100
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
@@ -244,11 +244,11 @@ def bmi_readings_with_chart(patient_id):
     st.divider()
     st.subheader("5.Body Mass Index")
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_time,bgm,id, description,score FROM hba1c WHERE patient_id = '" + str(patient_id) + "'"
+    sql = "SELECT reading_date,bmi_reading,description,score FROM bmi WHERE patient_id = '" + str(patient_id) + "'"
     cursor=conn.cursor()
     cursor.execute(sql)
     resultset = cursor.fetchall()
-    new_df = get_row_data_with_annotations(resultset)
+    new_df = get_bmi_data_with_annotations(resultset)
     new_df['Reading date'] = pd.to_datetime(new_df['Reading date'])
     source = new_df
     source
@@ -258,7 +258,7 @@ def bmi_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=500
+        width=1100
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
@@ -296,7 +296,55 @@ def get_row_data_with_annotations(resultset):
        new_row = [row[0], "Optimal", 5]
        df.loc[len(df.index)] = new_row
     return df
- 
+def get_bp_data_with_annotations(resultset):
+    df = pd.DataFrame(columns=["Reading date","Description","Score"])
+    for row in resultset:
+       new_row = [row[0], "Reading", row[3]]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Grade 3/Urgency", 1]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Grade 2", 2]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Grade 1", 3]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Normal high", 4]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Normal", 5]
+       df.loc[len(df.index)] = new_row
+    return df
+def get_lipid_data_with_annotations(resultset):
+    df = pd.DataFrame(columns=["Reading date","Description","Score"])
+    for row in resultset:
+       new_row = [row[0], "Reading", row[3]]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Severely high", 1]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "High", 2]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Borderline high", 3]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Near optimal", 4]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Optimal", 5]
+       df.loc[len(df.index)] = new_row
+    return df
+def get_bmi_data_with_annotations(resultset):
+    df = pd.DataFrame(columns=["Reading date","Description","Score"])
+    for row in resultset:
+       new_row = [row[0], "Reading", row[3]]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Extreme obesity/Underweight", 1]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Obesity class 2", 2]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Obesity class 1", 3]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Overweigh", 4]
+       df.loc[len(df.index)] = new_row
+       new_row = [row[0], "Normal", 5]
+       df.loc[len(df.index)] = new_row
+    return df
+
 def load_readings(patient_id):
     st.divider()
     st.subheader("I.Blood Glucose Monitoring")
