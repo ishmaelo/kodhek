@@ -98,7 +98,7 @@ def load_readings_with_chart(patient_id):
     ).transform_filter(
         "datum.Description !== 'IBM'"
     ).properties(
-        width=500
+        width=1000
     )
 
     line = base.mark_line().encode(x="Reading date", y="Score")
