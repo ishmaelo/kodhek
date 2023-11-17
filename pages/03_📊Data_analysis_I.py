@@ -339,7 +339,7 @@ def get_bmi_data_with_annotations(resultset):
        df.loc[len(df.index)] = new_row
        new_row = [row[0], "Obesity class 1", 3]
        df.loc[len(df.index)] = new_row
-       new_row = [row[0], "Overweigh", 4]
+       new_row = [row[0], "Overweight", 4]
        df.loc[len(df.index)] = new_row
        new_row = [row[0], "Normal", 5]
        df.loc[len(df.index)] = new_row
