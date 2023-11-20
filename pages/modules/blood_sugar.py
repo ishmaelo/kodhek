@@ -4,7 +4,7 @@ def get_readings_for_display(conn,patient_id,start_date,end_date):
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
-       sql += " ORDER BY reading_date ASC LIMIT 10 "
+       sql += " ORDER BY reading_date DESC LIMIT 10 "
     cursor=conn.cursor()
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
@@ -14,7 +14,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
-       sql += " ORDER BY reading_date ASC LIMIT 10 "
+       sql += " ORDER BY reading_date DESC LIMIT 10 "
     cursor=conn.cursor()
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
@@ -25,7 +25,7 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
-        sql += " ORDER BY reading_date ASC LIMIT 10 "
+        sql += " ORDER BY reading_date DESC LIMIT 10 "
     cursor=conn.cursor()
     cursor.execute(sql)
     readings = cursor.fetchall()
@@ -38,11 +38,37 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     st.write("**MPC Scoring**")
     description = get_score_description(average_score)
     st.write("Score:",average_score,description)
+    
 
     
 def get_score_description(index):
     scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
+    
+def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
+    cursor = conn.cursor()
+    sql = "SELECT bgm_reading FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    if start_date:
+        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
+    else:
+        sql += " ORDER BY reading_date DESC LIMIT 10 "
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    readings = cursor.fetchall()
+    average_score = 0
+    divider = 0
+    if len(readings) < 84:
+        return
+    tir = 0
+    count = len(readings)
+    for row in readings:
+        val = row[0]
+        if val >= 3.9 and val <= 10:
+           tir += 1
+    
+    tir = (tir / count) * 100
+    st.write("**TIR values**")
+    st.write("TIR:",tir)
     
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
     st.divider()
@@ -54,6 +80,7 @@ def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_da
     #utility.annonation_chart(new_df,alt,st)
     utility.plotly_chart_separate(conn,patient_id,start_date,end_date,st)
     get_readings_for_score(conn,patient_id,start_date,end_date,st)
+    get_readings_for_tir(conn,patient_id,start_date,end_date,st)
   
 def readings_on_table_display(readings,st,datetime):
     st.write("**Patient blood glucose readings**")
