@@ -1,6 +1,6 @@
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_category,reading_time, bgm_reading, description FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,reading_category, bgm_reading, description FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -10,7 +10,7 @@ def get_readings_for_display(conn,patient_id,start_date,end_date):
     return cursor.fetchall() #database query to retrieve readings
 def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,scale FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,scale FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -21,7 +21,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     
 def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     cursor = conn.cursor()
-    sql = "SELECT score FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -38,14 +38,14 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     st.write("**MPC Scoring**")
     description = get_score_description(average_score)
     st.write("Score:",average_score,description)
-    st.session_state.blood_sugar_score = average_score
+    st.session_state.hba1c_score = average_score
     
 def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
     import numpy as np
     import matplotlib.pyplot as plt
     
     cursor = conn.cursor()
-    sql = "SELECT reading_date,score FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -66,11 +66,11 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     b = estimate_linear_regression_coefs(np,dates, scores)
     intercept, gradient = b
     conco = utility.check_con_dis_cordance(gradient)  
-    st.write("**Concordance/Discordance Test** - using a regression model")
+    st.write("**Concordance/Discordance Test**")
     st.write("Gradient: ",gradient)
     st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
-    st.session_state.blood_sugar_gradient = gradient
+    st.session_state.hba1c_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -104,91 +104,50 @@ def plot_regression_line(x, y, b, st):
   plot = plt.plot(x, y_pred, color = "m")
  
   # putting labels
-  plt.xlabel('Dates')
+  plt.xlabel('Reading Dates')
   plt.ylabel('BGM Scores')
   st.pyplot(plt)
   #plt.show()
 
+  
 def get_score_description(index):
     scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
     
-def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
-    cursor = conn.cursor()
-    sql = "SELECT bgm_reading FROM bgm WHERE patient_id = " + str(patient_id) + ""
-    if start_date:
-        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
-    else:
-        sql += " ORDER BY reading_date DESC LIMIT 10 "
-    cursor=conn.cursor()
-    cursor.execute(sql)
-    readings = cursor.fetchall()
-    average_score = 0
-    divider = 0
-    if len(readings) < 84:
-        return
-    tir = 0
-    count = len(readings)
-    for row in readings:
-        val = row[0]
-        if val >= 3.9 and val <= 10:
-           tir += 1
-    
-    tir = (tir / count) * 100
-    st.write("**TIR values**")
-    st.write("TIR:",tir)
-    
+
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
+    st.divider()
+    st.subheader("2. HBA1C " + date_range)
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime,date_range)  
-    #new_df = utility.get_blood_sugar_data_with_annotations(get_readings_for_graph(conn,patient_id),pd) #create plottable dataframe
-    #new_df['Reading date'] = pd.to_datetime(new_df['Reading date']) #normalize reading dates
-    #utility.annonation_chart(new_df,alt,st)
-    utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
+    readings_on_table_display(readings,st,datetime)  
+    utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
     get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_tir(conn,patient_id,start_date,end_date,st)
     get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
   
-def readings_on_table_display(readings,st,datetime,date_range):
-    st.write("**Blood Glucose Readings " + date_range + "**")
-    date, session, time, bgm, description = st.columns(5)
+def readings_on_table_display(readings,st,datetime):
+    date, session, bgm, description = st.columns(4)
     with date:
        st.write("**Date**")
     with session:
        st.write("**Reading session**")
-    with time:
-       st.write("**Time recorded**")
     with bgm:
-       st.write("**BGM (mmol/lit)**")
+       st.write("**Hba1c %**")
     with description:
        st.write("**Description**")
     i = 0
     date_reading = list()
     new_format = '%Y-%m-%d'
     for row in readings:
-        date_reading.append(row[0])
-        j = i-1
-        previous_reading = ''        
-        if i > 0:
-            previous_reading =  date_reading[j]
-            
         with date:
-           if i > 0 and previous_reading == row[0]:
-            st.write("'")
-           else:
             st.write(row[0])
         with session:
            st.write(row[1])
-        with time:
-           st.write(row[2])
         with bgm:
-           st.write(str(row[3]))
+           st.write(row[2])
         with description:
-           st.write(row[4])
+           st.write(row[3])
         i += 1
        
-       
-
 def get_row_data(resultset):
     dates = list()
     optimal = list()
