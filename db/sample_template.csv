@@ -1,0 +1,3 @@
+id,patient_id,reading_date,reading,score,scale,description
+1,1,01/01/2022,25mg/dl,4,2,Good
+2,1,01/01/2023,350mg/dl,2,4,Poor
