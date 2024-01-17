@@ -165,3 +165,33 @@ def get_row_data(resultset):
        high.append(2)
        very_high.append(1)
     return dates,optimal,normal,elevated,high,very_high
+    
+def initial_diagnosis_correlation_readings(conn, patient_id, diagnosis_date):
+    cursor = conn.cursor()
+    sql = "SELECT scale, score FROM patient_lipid WHERE patient_id = " + str(patient_id) + " AND reading_date = '" + str (diagnosis_date) + "'";
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    reading = reading_scores = 0
+    for row in rows:
+        reading = row[0]
+        reading_scores = row[1]
+    return reading_scores, reading
+    
+    
+def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,new_date_str, initial_readings, initial_readings_scores):
+    cursor = conn.cursor()
+    sql = "SELECT scale, score FROM patient_lipid WHERE patient_id = " + str(patient_id) + " AND reading_date BETWEEN DATE('" + str(old_date_str) + "') AND DATE('" + str(new_date_str) + "')"
+    cursor.execute(sql)
+    rows = cursor.fetchall()
+    reading = initial_readings
+    reading_scores = initial_readings_scores
+    divider = average_score = average_score_scores = 0
+    for row in rows:
+        average_score += row[0]
+        average_score_scores += row[1]
+        divider += 1
+       
+    if divider > 0:
+        reading = average_score/divider
+        reading_scores = average_score_scores/divider
+    return reading_scores, reading

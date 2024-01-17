@@ -85,8 +85,8 @@ def display_patient(patient):
     st.subheader("Part II - Summary of all Care Targets with the Final MPC Score")
     utility.target_summaries(pd,st)
     
-    st.subheader("Part III - Corelation between HBA1C (dependent variable) and the other Care Targets")
-    utility.target_summaries(pd,st)
+    st.subheader("Part III - Corelation between HBA1C (dependent variable) and the other Care Targets [ from scale ]")
+    utility.target_correlations(conn, patient,pd,st)
   
 # retrieve patient id via URL   
 patient_id = utility.get_patient_id_via_url(st)

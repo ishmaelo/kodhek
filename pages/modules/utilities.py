@@ -6,6 +6,10 @@ import pages.modules.bmi as bmi
 
 import math
 
+from datetime import date
+from datetime import datetime
+from dateutil import relativedelta
+
 def set_title(st):
     st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
     
@@ -29,8 +33,7 @@ def get_patient_id_via_url(st):
 
 
 def get_age(birth_date):
-    from datetime import date
-    from datetime import datetime
+    
     today = date.today()
     birth_date = datetime.strptime(birth_date, '%d/%m/%Y')
     age = today.year - birth_date.year
@@ -40,11 +43,9 @@ def get_age(birth_date):
     return age
     
 def number_of_months(start_date,end_date):
-    from datetime import date
-    from datetime import datetime
-    from dateutil import relativedelta
-    #start_date = datetime.strptime(start_date, '%Y-%m-%d')
-    #end_date = datetime.strptime(end_date, '%Y-%m-%d')
+ 
+    start_date = datetime.strptime(start_date, '%Y-%m-%d')
+    end_date = datetime.strptime(end_date, '%Y-%m-%d')
     
     r = relativedelta.relativedelta(end_date, start_date)
     total_months = r.months + (12*r.years)
@@ -56,6 +57,7 @@ def patient_header_info(patient,st):
     st.title(patient[1])
     age = ", {} {}".format(get_age(patient[2]), ' years')
     st.write(patient[3], age)
+    st.write("Diabetic since ", patient[12])
     st.markdown("""---""")
     
 def get_score_description(index):
@@ -407,7 +409,7 @@ def target_summaries(pd, st):
     hba1c_score = st.session_state.hba1c_score
     hba1c_gradient = st.session_state.hba1c_gradient
     hba1c_score_description = hba1c.get_score_description(blood_sugar_score)
-    hba1c_gradient_description = check_con_dis_cordance(blood_sugar_gradient,True)
+    hba1c_gradient_description = check_con_dis_cordance(hba1c_gradient,True)
     new_row = ["HBA1C",hba1c_score,hba1c_score_description,hba1c_gradient,hba1c_gradient_description]
     df.loc[len(df.index)] = new_row
     
@@ -423,3 +425,108 @@ def target_summaries(pd, st):
     
     df = df.set_index('Care Target')
     st.write(df)
+    
+    
+def target_correlations(conn, patient, pd, st):
+    df = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI"])
+    df_scores = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI"])
+    
+    #date difference
+    daignosis_date = patient[12] #diagnosis date 
+    today_date = date.today()
+    today = today_date.strftime('%Y-%m-%d')
+    duration = number_of_months(daignosis_date,today)
+    st.write("Duration: ",duration, " months")
+    
+    #initial date readings
+    hba1c_initial_readings_scores, hba1c_initial_readings = hba1c.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    lipid_initial_readings_scores, lipid_initial_readings = lipid.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    blood_pressure_initial_readings_scores, blood_pressure_initial_readings = blood_pressure.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    bmi_initial_readings_scores, bmi_initial_readings = bmi.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    daignosis_date_str = "As at " + str(daignosis_date)
+    
+    #add the date readings into the datframe
+    new_row = [daignosis_date,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings]
+    new_row_scores = [daignosis_date,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores]
+    
+    df.loc[len(df.index)] = new_row
+    df_scores.loc[len(df_scores.index)] = new_row_scores
+    
+    #subsequent readings
+    phases = math.ceil(duration/3)+1
+    old_date = datetime.strptime(daignosis_date, '%Y-%m-%d')
+    for phase in range(phases):
+        old_date_str = old_date.strftime('%Y-%m-%d')
+        new_daignosis_date = datetime.strptime(old_date_str, '%Y-%m-%d')
+        new_date = pd.to_datetime(old_date_str)+pd.DateOffset(months=3)
+        if new_date > pd.Timestamp(today_date):
+            new_date = pd.to_datetime(today)
+        new_date_str = new_date.strftime('%Y-%m-%d')
+        #capture readings as at new date
+        hba1c_initial_readings_scores,hba1c_initial_readings = hba1c.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,hba1c_initial_readings,hba1c_initial_readings_scores)
+        lipid_initial_readings_scores, lipid_initial_readings = lipid.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,lipid_initial_readings, lipid_initial_readings_scores)
+        blood_pressure_initial_readings_scores, blood_pressure_initial_readings = blood_pressure.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,blood_pressure_initial_readings, blood_pressure_initial_readings_scores)
+        bmi_initial_readings_scores, bmi_initial_readings = bmi.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,bmi_initial_readings, bmi_initial_readings_scores)
+        
+        #add the date readings into the datframe
+        new_row = [new_date_str,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings]
+        df.loc[len(df.index)] = new_row
+        
+        new_row_scores = [new_date_str,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores]
+        df_scores.loc[len(df_scores.index)] = new_row_scores
+    
+        #progress date
+        old_date = new_date
+
+    df = df.set_index('Period/Date')
+    df_scores = df_scores.set_index('Period/Date')
+    
+    st.write(df)
+    st.write(df.corr(method='pearson'))
+    
+    ## Proceed to Logistic Regression with the same dataset
+    logistic_regression(df_scores, st, pd)
+    
+def target_correlations_initial_readings(patient, pd, st):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date,scale FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    if start_date:
+        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
+    else:
+       sql += " ORDER BY reading_date DESC LIMIT 10 "
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    return cursor.fetchall() #database query to retrieve readings
+    
+    
+def logistic_regression(df_scores, st, pd):
+    st.subheader("Part IV - Logistic Regression between Care Targets (independent variables) and HBA1C (dependent variable) [from scores]")
+    st.write(df_scores)
+    from sklearn import linear_model
+
+    # Select features and target variable
+    X = df_scores[["Blood Pressure","Lipids","BMI"]]  # Replace with your feature names
+    y = df_scores["HBA1C"]
+    
+    model = linear_model.LinearRegression()
+    model.fit(X, y)
+    
+    #st.write(regr)
+
+    # Split data into training and testing sets
+    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25, random_state=42)
+
+    # Create a logistic regression model instance
+    #model = LogisticRegression()
+
+    # Train the model on the training data
+    #model.fit(X_train, y_train)
+
+    # Make predictions on the testing data
+    #y_pred = model.predict(X_test)
+
+    # Print model coefficients and intercept
+    st.write("Coefficients:", model.coef_)
+    st.write("Intercept:", model.intercept_)
+    
+    
