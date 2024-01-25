@@ -10,11 +10,11 @@ def get_readings_for_display(conn,patient_id,start_date,end_date):
     return cursor.fetchall() #database query to retrieve readings
 def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,scale FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,AVG(scale) FROM bgm WHERE patient_id = " + str(patient_id) + ""
     if start_date:
-        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
+        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') GROUP BY reading_date ORDER BY reading_date ASC";
     else:
-       sql += " ORDER BY reading_date DESC LIMIT 10 "
+       sql += " GROUP BY reading_date ORDER BY reading_date DESC LIMIT 10 "
     cursor=conn.cursor()
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
@@ -45,11 +45,11 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     import matplotlib.pyplot as plt
     
     cursor = conn.cursor()
-    sql = "SELECT reading_date,score FROM bgm WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,AVG(scale) FROM bgm WHERE patient_id = " + str(patient_id) + ""
     if start_date:
-        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
+        sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') GROUP BY reading_date ORDER BY reading_date ASC";
     else:
-        sql += " ORDER BY reading_date DESC LIMIT 10 "
+        sql += " GROUP BY reading_date ORDER BY reading_date DESC LIMIT 10 "
     cursor=conn.cursor()
     cursor.execute(sql)
     readings = cursor.fetchall()
@@ -58,7 +58,7 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     for row in readings:
         dates.append(row[0])
         scores.append(row[1])
-    
+    #st.write(dates,scores)
     dates = np.array(dates)
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
@@ -110,7 +110,7 @@ def plot_regression_line(x, y, b, st):
   #plt.show()
 
 def get_score_description(index):
-    scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
     
 def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
@@ -141,9 +141,6 @@ def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,datetime,date_range)  
-    #new_df = utility.get_blood_sugar_data_with_annotations(get_readings_for_graph(conn,patient_id),pd) #create plottable dataframe
-    #new_df['Reading date'] = pd.to_datetime(new_df['Reading date']) #normalize reading dates
-    #utility.annonation_chart(new_df,alt,st)
     utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
     get_readings_for_score(conn,patient_id,start_date,end_date,st)
     get_readings_for_tir(conn,patient_id,start_date,end_date,st)

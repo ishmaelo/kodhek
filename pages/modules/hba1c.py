@@ -34,7 +34,9 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     for row in readings:
         average_score += row[0]
         divider += 1
-    average_score = round(average_score / divider)
+        
+    if (divider>0):
+        average_score = round(average_score / divider)
     st.write("**MPC Scoring**")
     description = get_score_description(average_score)
     st.write("Score:",average_score,description)
@@ -62,15 +64,19 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     dates = np.array(dates)
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
-    #plot
-    b = estimate_linear_regression_coefs(np,dates, scores)
-    intercept, gradient = b
-    conco = utility.check_con_dis_cordance(gradient)  
+    
     st.write("**Concordance/Discordance Test**")
-    st.write("Gradient: ",gradient)
-    st.markdown(conco, unsafe_allow_html=True)
-    plot_regression_line(dates, scores, b, st)
-    st.session_state.hba1c_gradient = gradient
+    if len(scores)<1:
+        st.write("Missing records")
+    else:
+        b = estimate_linear_regression_coefs(np,dates, scores)
+        intercept, gradient = b
+        conco = utility.check_con_dis_cordance(gradient)  
+       
+        st.write("Gradient: ",gradient)
+        st.markdown(conco, unsafe_allow_html=True)
+        plot_regression_line(dates, scores, b, st)
+        st.session_state.hba1c_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -173,11 +179,12 @@ def initial_diagnosis_correlation_readings(conn, patient_id, diagnosis_date):
     reading = reading_scores = 0
     for row in rows:
         reading = row[0]
-        reading_scores = row[1]
+        reading_scores = get_score_description(row[1])
     return reading_scores, reading
     
     
 def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,new_date_str,initial_readings, initial_readings_scores):
+    import math
     cursor = conn.cursor()
     sql = "SELECT scale, score FROM hba1c WHERE patient_id = " + str(patient_id) + " AND reading_date BETWEEN DATE('" + str(old_date_str) + "') AND DATE('" + str(new_date_str) + "')"
     cursor.execute(sql)
@@ -193,4 +200,5 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
     if divider > 0:
         reading = average_score/divider
         reading_scores = average_score_scores/divider
+        reading_scores = get_score_description(math.ceil(reading_scores))
     return reading_scores, reading

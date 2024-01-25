@@ -33,7 +33,6 @@ def get_patient_id_via_url(st):
 
 
 def get_age(birth_date):
-    
     today = date.today()
     birth_date = datetime.strptime(birth_date, '%d/%m/%Y')
     age = today.year - birth_date.year
@@ -42,22 +41,43 @@ def get_age(birth_date):
         age -= 1
     return age
     
+def get_daignosis_duration(the_date):
+    today = date.today()
+    dx_date = datetime.strptime(the_date, '%Y-%m-%d')
+    r = relativedelta.relativedelta(today, dx_date)
+    return r.years, r.months
+   
 def number_of_months(start_date,end_date):
- 
     start_date = datetime.strptime(start_date, '%Y-%m-%d')
     end_date = datetime.strptime(end_date, '%Y-%m-%d')
-    
     r = relativedelta.relativedelta(end_date, start_date)
     total_months = r.months + (12*r.years)
-    return total_months
+    mnths = "less than a month"
+    if r.days > 0:
+        total_months += 1
+    if (total_months==1):
+        mnths = str(total_months)  + " month"
+    if (total_months>1):
+        mnths = str(total_months) + " months"    
+    return mnths
 
 def patient_header_info(patient,st):    
     st.link_button("Back to list of patients", "Patients")
     patient_id = patient[0]
     st.title(patient[1])
-    age = ", {} {}".format(get_age(patient[2]), ' years')
+    age = ", {} {} ".format(get_age(patient[2]), ' years')
     st.write(patient[3], age)
-    st.write("Diabetic since ", patient[12])
+    years, months = get_daignosis_duration(patient[12])
+    yrs = mnths = ''
+    if (years==1):
+        yrs = str(years) + " year"
+    if (years>1):
+        yrs = str(years) + " years"
+    if (months==1):
+        mnths = str(months)  + " month"
+    if (months>1):
+        mnths = str(months) + " months"
+    st.write("Diabetic for the last ", yrs, mnths)
     st.markdown("""---""")
     
 def get_score_description(index):
@@ -203,7 +223,8 @@ def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
                    xaxis=dict(showgrid=True), 
                    yaxis=dict(showgrid=True)
                    )
-    st.write(fig)
+    #st.write(fig)
+    st.plotly_chart(fig, use_container_width=True)
 def plotly_chart_hba1c(conn,patient_id,start_date,end_date,st):
     import pages.modules.hba1c as hba1c
     # data
@@ -502,14 +523,31 @@ def target_correlations_initial_readings(patient, pd, st):
 def logistic_regression(df_scores, st, pd):
     st.subheader("Part IV - Logistic Regression between Care Targets (independent variables) and HBA1C (dependent variable) [from scores]")
     st.write(df_scores)
-    from sklearn import linear_model
+    #from ordinal import OrderedLogit
+    from statsmodels.miscmodels.ordinal_model import OrderedModel
+    
+    #convert to categorical
+    cols = ['HBA1C']
+    df_scores[cols] = df_scores[cols].astype('category')
+    
+    import numpy as np
+    #data types
+    st.write(df_scores.dtypes)
+    
+    
+    #st.write(df_scores['HBA1C'].dtype)
 
     # Select features and target variable
     X = df_scores[["Blood Pressure","Lipids","BMI"]]  # Replace with your feature names
     y = df_scores["HBA1C"]
     
-    model = linear_model.LinearRegression()
-    model.fit(X, y)
+    #st.write(df_scores['HBA1C'])
+    
+    # Fit the ordinal regression model
+    model = OrderedModel(y, X, distr='logit',hasconst=False)
+    res_log = model.fit(method='bfgs', disp=False)
+    res_log.summary()
+   
     
     #st.write(regr)
 
@@ -526,7 +564,7 @@ def logistic_regression(df_scores, st, pd):
     #y_pred = model.predict(X_test)
 
     # Print model coefficients and intercept
-    st.write("Coefficients:", model.coef_)
-    st.write("Intercept:", model.intercept_)
+    st.write(res_log.summary())
+    #st.write("Intercept:", model.intercept_)
     
     
