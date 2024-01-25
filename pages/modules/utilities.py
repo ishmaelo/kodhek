@@ -59,7 +59,7 @@ def number_of_months(start_date,end_date):
         mnths = str(total_months)  + " month"
     if (total_months>1):
         mnths = str(total_months) + " months"    
-    return mnths
+    return mnths,total_months
 
 def patient_header_info(patient,st):    
     st.link_button("Back to list of patients", "Patients")
@@ -456,8 +456,8 @@ def target_correlations(conn, patient, pd, st):
     daignosis_date = patient[12] #diagnosis date 
     today_date = date.today()
     today = today_date.strftime('%Y-%m-%d')
-    duration = number_of_months(daignosis_date,today)
-    st.write("Duration: ",duration, " months")
+    duration,months = number_of_months(daignosis_date,today)
+    st.write("Duration: ",duration)
     
     #initial date readings
     hba1c_initial_readings_scores, hba1c_initial_readings = hba1c.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
@@ -474,7 +474,7 @@ def target_correlations(conn, patient, pd, st):
     df_scores.loc[len(df_scores.index)] = new_row_scores
     
     #subsequent readings
-    phases = math.ceil(duration/3)+1
+    phases = math.ceil(months/3)+1
     old_date = datetime.strptime(daignosis_date, '%Y-%m-%d')
     for phase in range(phases):
         old_date_str = old_date.strftime('%Y-%m-%d')
