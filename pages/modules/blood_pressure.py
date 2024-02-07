@@ -19,7 +19,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
     sql = "SELECT score FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -34,12 +34,19 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     for row in readings:
         average_score += row[0]
         divider += 1
-    average_score = round(average_score / divider)
-    st.write("**MPC Scoring**")
-    description = get_score_description(average_score)
-    st.write("Score:",average_score,description)
+    if divider == 0:
+        average_score = 0
+    else:
+        average_score = round(average_score / divider)
+        #st.write("**MPC Scoring**")
+        description = get_score_description(average_score)
+        score_str = utility.format_label(str(average_score)+ ", " + description)
+        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
+    st.session_state.blood_pressure_score = average_score
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
+    return divider
+    
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd, utility):
     import numpy as np
     import matplotlib.pyplot as plt
     
@@ -61,14 +68,16 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
     dates = np.array(dates)
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
-    #plot
+   #plot
     b = estimate_linear_regression_coefs(np,dates, scores)
     intercept, gradient = b
-    conco = check_con_dis_cordance(gradient)  
-    st.write("**Concordance/Discordance Test**")
-    st.write("Gradient: ",gradient)
-    st.markdown(conco, unsafe_allow_html=True)
+    conco = utility.check_con_dis_cordance(gradient,True)  
+    conco_str = utility.format_label(conco)
+    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    #st.write("Gradient: ",gradient)
+    #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
+    st.session_state.blood_pressure_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -90,7 +99,8 @@ def estimate_linear_regression_coefs(np, x, y):
   return  (b_0, b_1)
   
 def plot_regression_line(x, y, b, st):
-  import matplotlib.pyplot as plt  
+  import matplotlib.pyplot as plt
+  plt.clf()  
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
         marker = "x", s = 30)
@@ -103,7 +113,7 @@ def plot_regression_line(x, y, b, st):
  
   # putting labels
   plt.xlabel('Reading Dates')
-  plt.ylabel('BGM Scores')
+  plt.ylabel('Blood Pressure Scores')
   st.pyplot(plt)
   #plt.show()
 def check_con_dis_cordance(b):
@@ -113,20 +123,23 @@ def check_con_dis_cordance(b):
         return '<p style="color:red;font-weight: bold;">Discordant</p>'
   
 def get_score_description(index):
-    scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
     
     
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
-    st.divider()
-    st.subheader("3. Blood Pressure " + date_range)
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime)  
+    readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st)
-    get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
+    if value > 0:
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
   
-def readings_on_table_display(readings,st,datetime):
+def readings_on_table_display(readings,st,date_range):
+    if len(readings)<1:
+      st.write("Insufficient readings to display the table")
+      return
+    st.write("**Blood Pressure " + date_range + "**")
     date, bp, mbp, description = st.columns(4)
     with date:
        st.write("**Date**")
@@ -143,9 +156,9 @@ def readings_on_table_display(readings,st,datetime):
         with date:
            st.write(row[0])
         with bp:
-           st.write(row[2],'/',row[1])
+           st.write(str(row[1]),'/',str(row[2]))
         with mbp:
-           st.write(row[3])
+           st.write(str(row[3]))
         with description:
            st.write(row[4])
         i += 1

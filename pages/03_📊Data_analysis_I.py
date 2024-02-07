@@ -58,7 +58,9 @@ def display_patient(patient):
     if col4.button('Load readings for the selected date range',type="primary"):
         start_date = str(st.session_state.start)
         end_date = str(st.session_state.end)
-        st.write('Duration of the analysis:', utility.number_of_months(start_date,end_date))
+        mnths,total_months = utility.number_of_months(start_date,end_date)
+        mnths = utility.format_label(mnths)
+        st.markdown('Duration of the analysis: '+ mnths,unsafe_allow_html=True)
         date_range = " (Readings between " + str (start_date) + " and " + str(end_date) + ")"
         with st.expander("**1. Blood Sugar**"):
             blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)

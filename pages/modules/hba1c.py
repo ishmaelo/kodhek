@@ -19,7 +19,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
     sql = "SELECT score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -35,12 +35,17 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
         average_score += row[0]
         divider += 1
         
-    if (divider>0):
+    if divider == 0:
+        average_score = 0
+    else:
         average_score = round(average_score / divider)
-    st.write("**MPC Scoring**")
-    description = get_score_description(average_score)
-    st.write("Score:",average_score,description)
+        #st.write("**MPC Scoring**")
+        description = get_score_description(average_score)
+        score_str = utility.format_label(str(average_score)+ ", " + description)
+        st.markdown("MPC Score: " + score_str, unsafe_allow_html=True)
     st.session_state.hba1c_score = average_score
+    
+    return divider
     
 def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
     import numpy as np
@@ -65,18 +70,16 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
     
-    st.write("**Concordance/Discordance Test**")
-    if len(scores)<1:
-        st.write("Missing records")
-    else:
-        b = estimate_linear_regression_coefs(np,dates, scores)
-        intercept, gradient = b
-        conco = utility.check_con_dis_cordance(gradient)  
-       
-        st.write("Gradient: ",gradient)
-        st.markdown(conco, unsafe_allow_html=True)
-        plot_regression_line(dates, scores, b, st)
-        st.session_state.hba1c_gradient = gradient
+   #plot
+    b = estimate_linear_regression_coefs(np,dates, scores)
+    intercept, gradient = b
+    conco = utility.check_con_dis_cordance(gradient,True)  
+    conco_str = utility.format_label(conco)
+    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    #st.write("Gradient: ",gradient)
+    #st.markdown(conco, unsafe_allow_html=True)
+    plot_regression_line(dates, scores, b, st)
+    st.session_state.hba1c_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -99,6 +102,7 @@ def estimate_linear_regression_coefs(np, x, y):
   
 def plot_regression_line(x, y, b, st):
   import matplotlib.pyplot as plt  
+  plt.clf()
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
         marker = "x", s = 30)
@@ -111,31 +115,32 @@ def plot_regression_line(x, y, b, st):
  
   # putting labels
   plt.xlabel('Reading Dates')
-  plt.ylabel('BGM Scores')
+  plt.ylabel('HBA1C Scores')
   st.pyplot(plt)
   #plt.show()
 
   
 def get_score_description(index):
-    scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
     
 
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
-    st.divider()
-    st.subheader("2. HBA1C " + date_range)
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime)  
+    readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
-    get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
+    if value > 0:
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
   
-def readings_on_table_display(readings,st,datetime):
-    date, session, bgm, description = st.columns(4)
+def readings_on_table_display(readings,st,date_range):
+    if len(readings)<1:
+       st.write("Insufficient readings to display the table")
+       return
+    st.write("**HBA1C Readings " + date_range + "**")
+    date, bgm, description = st.columns(3)
     with date:
        st.write("**Date**")
-    with session:
-       st.write("**Reading session**")
     with bgm:
        st.write("**Hba1c %**")
     with description:
@@ -146,10 +151,8 @@ def readings_on_table_display(readings,st,datetime):
     for row in readings:
         with date:
             st.write(row[0])
-        with session:
-           st.write(row[1])
         with bgm:
-           st.write(row[2])
+           st.write(str(row[2]))
         with description:
            st.write(row[3])
         i += 1

@@ -65,8 +65,8 @@ def patient_header_info(patient,st):
     st.link_button("Back to list of patients", "Patients")
     patient_id = patient[0]
     st.title(patient[1])
-    age = ", {} {} ".format(get_age(patient[2]), ' years')
-    st.write(patient[3], age)
+    age = " {} {} ".format(get_age(patient[2]), ' years')
+    st.write(patient[3],",", age)
     years, months = get_daignosis_duration(patient[12])
     yrs = mnths = ''
     if (years==1):
@@ -188,6 +188,9 @@ def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
     # data
     data = blood_sugar.get_readings_for_graph(conn,patient_id,start_date,end_date)
     dates,optimal,normal,elevated,high,very_high,reading = get_row_data_blood_sugar(data)
+    if len(dates)<1:
+        st.write("Insufficient readings to generate graph")
+        return
     import plotly.graph_objects as go
 
     fig = go.Figure()
@@ -195,23 +198,23 @@ def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
     # Add traces
     fig.add_trace(go.Scatter(x=dates, y=optimal,
                         mode='lines',
-                        line=dict(color='green'),
+                        line=dict(color='green',width=5),
                         name='Optimal'))
     fig.add_trace(go.Scatter(x=dates, y=normal,
                         mode='lines',
-                        line=dict(color='blue'),
+                        line=dict(color='blue',width=6),
                         name='Normal'))
     fig.add_trace(go.Scatter(x=dates, y=elevated,
                         mode='lines',
-                        line=dict(color='orange'),
+                        line=dict(color='orange',width=7),
                         name='Elevated'))
     fig.add_trace(go.Scatter(x=dates, y=high,
                         mode='lines',
-                        line=dict(color='brown'),
+                        line=dict(color='brown',width=8),
                         name='High'))
     fig.add_trace(go.Scatter(x=dates, y=very_high,
                         mode='lines',
-                        line=dict(color='red'),
+                        line=dict(color='red',width=10),
                         name='Very high'))
     fig.add_trace(go.Scatter(x=dates, y=reading,
                         mode='lines+markers',
@@ -230,6 +233,9 @@ def plotly_chart_hba1c(conn,patient_id,start_date,end_date,st):
     # data
     data = hba1c.get_readings_for_graph(conn,patient_id,start_date,end_date)
     dates,optimal,normal,elevated,high,very_high,reading = get_row_data_hba1c(data)
+    if len(dates)<1:
+       st.write("Insufficient readings to generate graph")
+       return
     import plotly.graph_objects as go
 
     fig = go.Figure()
@@ -237,24 +243,24 @@ def plotly_chart_hba1c(conn,patient_id,start_date,end_date,st):
     # Add traces
     fig.add_trace(go.Scatter(x=dates, y=optimal,
                         mode='lines',
-                        line=dict(color='green'),
+                        line=dict(color='green',width=4),
                         name='Optimal'))
     fig.add_trace(go.Scatter(x=dates, y=normal,
                         mode='lines',
-                        line=dict(color='blue'),
+                        line=dict(color='blue',width=5),
                         name='Normal'))
     fig.add_trace(go.Scatter(x=dates, y=elevated,
                         mode='lines',
-                        line=dict(color='orange'),
+                        line=dict(color='orange',width=7),
                         name='Elevated'))
     fig.add_trace(go.Scatter(x=dates, y=high,
                         mode='lines',
-                        line=dict(color='brown'),
-                        name='High'))
+                        line=dict(color='brown',width=8),
+                        name='High/Grade 1 hypo'))
     fig.add_trace(go.Scatter(x=dates, y=very_high,
                         mode='lines',
-                        line=dict(color='red'),
-                        name='Very high'))
+                        line=dict(color='red',width=10),
+                        name='Very high/Grade 2 hypo'))
     fig.add_trace(go.Scatter(x=dates, y=reading,
                         mode='lines+markers',
                         line=dict(color='magenta',width=7),
@@ -265,13 +271,16 @@ def plotly_chart_hba1c(conn,patient_id,start_date,end_date,st):
                    xaxis=dict(showgrid=True), 
                    yaxis=dict(showgrid=True)
                    )
-    st.write(fig)        
+    st.plotly_chart(fig, use_container_width=True)   
 
 def plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st):
     import pages.modules.blood_pressure as blood_pressure
     # data
     data = blood_pressure.get_readings_for_graph(conn,patient_id,start_date,end_date)
     dates,optimal,normal,elevated,high,very_high,reading = get_row_data_blood_pressure(data)
+    if len(dates)<1:
+        st.write("Insufficient readings to generate graph")
+        return
     import plotly.graph_objects as go
 
     fig = go.Figure()
@@ -307,7 +316,7 @@ def plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st):
                    xaxis=dict(showgrid=True), 
                    yaxis=dict(showgrid=True)
                    )
-    st.write(fig)   
+    st.plotly_chart(fig, use_container_width=True)
 def plotly_chart_bmi(conn,patient_id,start_date,end_date,st):
     import pages.modules.bmi as bmi
     # data
@@ -414,16 +423,20 @@ def check_con_dis_cordance(b,formating=False):
         return '<p style="color:green; font-weight: bold;">Concordant</p>'
     else:
         return '<p style="color:red;font-weight: bold;">Discordant</p>'
-  
+
+def format_label(label):
+    return '<span style="color:green; font-weight: bold;">'+str(label)+'</span>'
+    
+    
 def target_summaries(pd, st):
-    df = pd.DataFrame(columns=["Care Target","MPC Score","Description","Gradient","Concordance"])
+    df = pd.DataFrame(columns=["Care Target","MPC Score","Description","Concordance"])
     
     #blood sugar
     blood_sugar_score = st.session_state.blood_sugar_score
     blood_sugar_gradient = st.session_state.blood_sugar_gradient
     blood_sugar_score_description = blood_sugar.get_score_description(blood_sugar_score)
     blood_sugar_gradient_description = check_con_dis_cordance(blood_sugar_gradient,True)
-    new_row = ["Blood Sugar",blood_sugar_score,blood_sugar_score_description,blood_sugar_gradient,blood_sugar_gradient_description]
+    new_row = ["Blood Sugar",blood_sugar_score,blood_sugar_score_description,blood_sugar_gradient_description]
     df.loc[len(df.index)] = new_row
     
     #HBA1C
@@ -431,7 +444,7 @@ def target_summaries(pd, st):
     hba1c_gradient = st.session_state.hba1c_gradient
     hba1c_score_description = hba1c.get_score_description(blood_sugar_score)
     hba1c_gradient_description = check_con_dis_cordance(hba1c_gradient,True)
-    new_row = ["HBA1C",hba1c_score,hba1c_score_description,hba1c_gradient,hba1c_gradient_description]
+    new_row = ["HBA1C",hba1c_score,hba1c_score_description,hba1c_gradient_description]
     df.loc[len(df.index)] = new_row
     
     #Summary
@@ -441,7 +454,7 @@ def target_summaries(pd, st):
     average_gradient_description = check_con_dis_cordance(average_gradient,True)
     
     
-    new_row = ["Overall",average_score,averages_score_description,average_gradient,average_gradient_description]
+    new_row = ["Overall",average_score,averages_score_description,average_gradient_description]
     df.loc[len(df.index)] = new_row
     
     df = df.set_index('Care Target')

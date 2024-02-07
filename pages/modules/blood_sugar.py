@@ -19,7 +19,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
     sql = "SELECT score FROM bgm WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -34,11 +34,17 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     for row in readings:
         average_score += row[0]
         divider += 1
-    average_score = round(average_score / divider)
-    st.write("**MPC Scoring**")
-    description = get_score_description(average_score)
-    st.write("Score:",average_score,description)
+    if divider == 0:
+        average_score = 0
+    else:
+        average_score = round(average_score / divider)
+        #st.write("**MPC Scoring**")
+        description = get_score_description(average_score)
+        score_str = utility.format_label(str(average_score)+ ", " + description)
+        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
     st.session_state.blood_sugar_score = average_score
+    
+    return divider
     
 def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
     import numpy as np
@@ -65,10 +71,11 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     #plot
     b = estimate_linear_regression_coefs(np,dates, scores)
     intercept, gradient = b
-    conco = utility.check_con_dis_cordance(gradient)  
-    st.write("**Concordance/Discordance Test** - using a regression model")
-    st.write("Gradient: ",gradient)
-    st.markdown(conco, unsafe_allow_html=True)
+    conco = utility.check_con_dis_cordance(gradient,True)  
+    conco_str = utility.format_label(conco)
+    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    #st.write("Gradient: ",gradient)
+    #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
     st.session_state.blood_sugar_gradient = gradient
     
@@ -113,7 +120,7 @@ def get_score_description(index):
     scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
     
-def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
+def get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility):
     cursor = conn.cursor()
     sql = "SELECT bgm_reading FROM bgm WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -135,18 +142,23 @@ def get_readings_for_tir(conn,patient_id,start_date,end_date,st):
            tir += 1
     
     tir = (tir / count) * 100
-    st.write("**TIR values**")
-    st.write("TIR:",tir)
+    tir_str = utility.format_label(tir)
+    #st.write("**TIR values**")
+    st.markdown("TIR: " + tir_str,unsafe_allow_html=True)
     
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,datetime,date_range)  
     utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
-    get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_tir(conn,patient_id,start_date,end_date,st)
-    get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st, utility)
+    if value > 0:
+        get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
   
 def readings_on_table_display(readings,st,datetime,date_range):
+    if len(readings)<1:
+        st.write("Insufficient readings to display the table")
+        return
     st.write("**Blood Glucose Readings " + date_range + "**")
     date, session, time, bgm, description = st.columns(5)
     with date:
