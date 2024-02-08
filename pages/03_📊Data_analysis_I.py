@@ -2,8 +2,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime
 import altair as alt
+
 ###custom modules#############
 import pages.modules.utilities as utility
+import pages.modules.widgets as widgets
+import streamlit.components.v1 as components
+
+
 import pages.modules.blood_sugar as blood_sugar
 import pages.modules.hba1c as hba1c
 import pages.modules.blood_pressure as blood_pressure
@@ -63,26 +68,26 @@ def display_patient(patient):
         st.markdown('Duration of the analysis: '+ mnths,unsafe_allow_html=True)
         date_range = " (Readings between " + str (start_date) + " and " + str(end_date) + ")"
         with st.expander("**1. Blood Sugar**"):
-            blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)
+            blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
         with st.expander("**2. HBA1C**"):
-            hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)
+            hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
         with st.expander("**3. Blood Pressure**"):
-            blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)
+            blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
         with st.expander("**4. Lipids**"):
-            lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)
+            lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
         with st.expander("**5. BMI**"):
-            bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range)
+            bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
     else:
-        with st.expander("**1. Blood Sugar**"):
-            blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range)
-        with st.expander("**2. HBA1C**"):
-            hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range)
-        with st.expander("**3. Blood Pressure**"):
-            blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range)
-        with st.expander("**4. Lipids**"):
-            lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range)
-        with st.expander("**5. BMI**"):
-            bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range)
+        #with st.expander("**1. Blood Sugar**"):
+        blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets, components)
+        #with st.expander("**2. HBA1C**"):
+        hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        #with st.expander("**3. Blood Pressure**"):
+        blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        #with st.expander("**4. Lipids**"):
+        lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        #with st.expander("**5. BMI**"):
+        bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
     
     st.subheader("Part II - Summary of all Care Targets with the Final MPC Score")
     utility.target_summaries(pd,st)

@@ -1,6 +1,6 @@
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,dbp, sbp, mean_abp, description FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,tg, tc, ldl, hdl, description FROM patient_lipid WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -10,7 +10,7 @@ def get_readings_for_display(conn,patient_id,start_date,end_date):
     return cursor.fetchall() #database query to retrieve readings
 def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,scale FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,scale FROM patient_lipid WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -18,10 +18,26 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor=conn.cursor()
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
-    
-def get_readings_for_score(conn,patient_id,start_date,end_date,st):
+def check_next_appointment(st,conn,patient_id,widgets,components,utility):
     cursor = conn.cursor()
-    sql = "SELECT score FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date FROM patient_lipid WHERE patient_id = " + str(patient_id) + " ORDER BY reading_date DESC LIMIT 1"
+    cursor.execute(sql)
+    readings = cursor.fetchall() #database query to retrieve readings
+    last_reading = overdue = ''
+    for row in readings:
+        last_reading = row[0]    
+    years, months = utility.get_daignosis_duration(last_reading)
+    if years>1:
+        overdue = utility.format_warning("next appointment is now overdue")
+    else:
+       next_date = utility.add_date(last_reading,1,0)
+       overdue = utility.format_label("next appointment is on " + next_date)
+    st.markdown("Last reading was in " + last_reading + ", " + overdue,unsafe_allow_html=True)
+    set_data_capture_form(conn,patient_id,st,widgets,components)
+    
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
+    cursor = conn.cursor()
+    sql = "SELECT score FROM patient_lipid WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -34,17 +50,24 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     for row in readings:
         average_score += row[0]
         divider += 1
-    average_score = round(average_score / divider)
-    st.write("**MPC Scoring**")
-    description = get_score_description(average_score)
-    st.write("Score:",average_score,description)
+    if divider == 0:
+        average_score = 0
+    else:
+        average_score = round(average_score / divider)
+        #st.write("**MPC Scoring**")
+        description = get_score_description(average_score)
+        score_str = utility.format_label(str(average_score)+ ", " + description)
+        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
+    st.session_state.blood_pressure_score = average_score
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
+    return divider
+    
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
     import numpy as np
     import matplotlib.pyplot as plt
     
     cursor = conn.cursor()
-    sql = "SELECT reading_date,score FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,score FROM patient_lipid WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -61,14 +84,16 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
     dates = np.array(dates)
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
-    #plot
+   #plot
     b = estimate_linear_regression_coefs(np,dates, scores)
     intercept, gradient = b
-    conco = check_con_dis_cordance(gradient)  
-    st.write("**Concordance/Discordance Test**")
-    st.write("Gradient: ",gradient)
-    st.markdown(conco, unsafe_allow_html=True)
+    conco = utility.check_con_dis_cordance(gradient,True)  
+    conco_str = utility.format_label(conco)
+    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    #st.write("Gradient: ",gradient)
+    #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
+    st.session_state.lipids_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -91,6 +116,7 @@ def estimate_linear_regression_coefs(np, x, y):
   
 def plot_regression_line(x, y, b, st):
   import matplotlib.pyplot as plt  
+  plt.clf() 
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
         marker = "x", s = 30)
@@ -103,7 +129,7 @@ def plot_regression_line(x, y, b, st):
  
   # putting labels
   plt.xlabel('Reading Dates')
-  plt.ylabel('BGM Scores')
+  plt.ylabel('Lipid Profile Scores')
   st.pyplot(plt)
   #plt.show()
 def check_con_dis_cordance(b):
@@ -117,23 +143,28 @@ def get_score_description(index):
     return scores[index]
     
     
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
-    st.divider()
-    st.subheader("3. Blood Pressure " + date_range)
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,datetime)  
-    utility.plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st)
-    get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd)
+    utility.plotly_chart_lipid(conn,patient_id,start_date,end_date,st)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
+    if value > 0:
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+        
+    check_next_appointment(st,conn,patient_id,widgets,components,utility)
   
 def readings_on_table_display(readings,st,datetime):
-    date, bp, mbp, description = st.columns(4)
+    date,tg,tc,ldl,hdl,description = st.columns(6)
     with date:
        st.write("**Date**")
-    with bp:
-       st.write("**Blood Pressure Reading**")
-    with mbp:
-       st.write("**Mean Arterial BP**")
+    with tg:
+       st.write("**Triglycerides**")
+    with tc:
+       st.write("**Total Cholestral**")
+    with ldl:
+       st.write("**Low Density Cholestral**")
+    with hdl:
+       st.write("**High Density Cholestral**")
     with description:
        st.write("**Description**")
     i = 0
@@ -141,13 +172,17 @@ def readings_on_table_display(readings,st,datetime):
     new_format = '%Y-%m-%d'
     for row in readings:
         with date:
-           st.write(row[0])
-        with bp:
-           st.write(row[2],'/',row[1])
-        with mbp:
-           st.write(row[3])
+           st.write(str(row[0]))
+        with tg:
+           st.write(str(row[1]))
+        with tc:
+           st.write(str(row[2]))
+        with ldl:
+           st.write(str(row[3]))
+        with hdl:
+           st.write(str(row[4]))
         with description:
-           st.write(row[4])
+           st.write(row[5])
         i += 1
        
 def get_row_data(resultset):
@@ -195,3 +230,68 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading = average_score/divider
         reading_scores = average_score_scores/divider
     return reading_scores, reading
+
+def save_to_db(conn,patient_id,reading_date,tg,tc,ldl,hdl,scale,score,description):
+    conn.execute(f'''
+            INSERT INTO patient_lipid (
+            patient_id, reading_date,tg,tc,ldl,hdl,scale,score,description
+            ) 
+            VALUES 
+            ('{patient_id}','{reading_date}','{tg}','{tc}','{ldl}','{hdl}','{scale}','{score}','{description}')
+            ''')
+    conn.commit()    
+    
+def set_data_capture_form(conn,patient_id,st,widgets,components):   
+    ##modal widgets##
+    modal = widgets.create_modal_widget("Capture Lipids reading","lipids",50,600)
+    open_modal = st.button("Capture Lipids reading","lipids")
+    
+    if open_modal:
+        modal.open()
+        
+    if modal.is_open():
+       
+        with modal.container():
+            result = ''
+            mpc = ''
+            score = ''
+            scale = ''
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="lipids-date")
+            
+            tg = st.number_input("Triglycerides:",key="lipids-tg")
+            tc = st.number_input("Total cholestral:",key="lipids-tc")
+            ldl = st.number_input("Low Density Cholestral:",key="lipids-ldl")
+            hdl = st.number_input("High Density Cholestral:",key="lipids-hdl")
+            if st.button('Submit reading',key="lipids-submit"):
+                if tg < 1.7 and tc <= 5.17 and ldl < 2 and hdl > 1.55:
+                    result = 'Optimal'
+                    mpc = 1
+                    score = 5
+                    st.success(result)
+                if (tg >= 1.7 and tg <= 5.63) or (tc >= 5.18 and tc <= 5.51) or (ldl >= 2.1 and hdl <= 2.5) or (hdl >= 1.55 and hdl <= 1.32):
+                    result = 'Near Optimal'
+                    mpc = 2
+                    score = 4
+                    st.info(result)
+                if (tg >= 5.64 and tg <= 7.5) or (tc >= 5.52 and tc <= 5.86) or (ldl >= 2.6 and hdl <= 3.3) or (hdl >= 1.31 and hdl <= 1.18):
+                    result = 'Borderline High'
+                    mpc = 3
+                    score = 3
+                    st.warning(result)        
+                if (tg >= 7.51 and tg <= 10) or (tc >= 5.87 and tc <= 6.18) or (ldl >= 3.4 and hdl <= 4.9) or (hdl >= 1.17 and hdl <= 1.03):
+                    result = 'High'
+                    mpc = 4
+                    score = 2
+                    st.error(result)
+                if tg >10 and tc > 6.18 and ldl < 4.9 and hdl <1.03:
+                    result = 'Severely High'
+                    mpc = 5
+                    score = 1
+                    st.error(result)
+                if not result:
+                    st.error('You have not entered valid inputs, please try again')
+                else:
+                    description = result
+                    scale = mpc
+                    save_to_db(conn,patient_id,reading_date,tg,tc,ldl,hdl,scale,score,description)
+                    st.success("Reading saved")

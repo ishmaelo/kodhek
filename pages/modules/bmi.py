@@ -18,8 +18,24 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor=conn.cursor()
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
+def check_next_appointment(st,conn,patient_id,widgets,components,utility):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date FROM bmi WHERE patient_id = " + str(patient_id) + " ORDER BY reading_date DESC LIMIT 1"
+    cursor.execute(sql)
+    readings = cursor.fetchall() #database query to retrieve readings
+    last_reading = overdue = ''
+    for row in readings:
+        last_reading = row[0]    
+    years, months = utility.get_daignosis_duration(last_reading)
+    if years>0 or months>6:
+        overdue = utility.format_warning("next appointment is now overdue")
+    else:
+       next_date = utility.add_date(last_reading,1,0)
+       overdue = utility.format_label("next appointment is on " + next_date)
+    st.markdown("Last reading was in " + last_reading + ", " + overdue,unsafe_allow_html=True)
+    set_data_capture_form(conn,patient_id,st,widgets,components)
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
     sql = "SELECT score FROM bmi WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -34,12 +50,19 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st):
     for row in readings:
         average_score += row[0]
         divider += 1
-    average_score = round(average_score / divider)
-    st.write("**MPC Scoring**")
-    description = get_score_description(average_score)
-    st.write("Score:",average_score,description)
+    if divider == 0:
+        average_score = 0
+    else:
+        average_score = round(average_score / divider)
+        #st.write("**MPC Scoring**")
+        description = get_score_description(average_score)
+        score_str = utility.format_label(str(average_score)+ ", " + description)
+        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
+    st.session_state.blood_pressure_score = average_score
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
+    return divider
+    
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd, utility):
     import numpy as np
     import matplotlib.pyplot as plt
     
@@ -61,14 +84,16 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd):
     dates = np.array(dates)
     dates = pd.to_datetime(dates).map(lambda d: d.toordinal())
     scores = np.array(scores)
-    #plot
+   #plot
     b = estimate_linear_regression_coefs(np,dates, scores)
     intercept, gradient = b
-    conco = check_con_dis_cordance(gradient)  
-    st.write("**Concordance/Discordance Test**")
-    st.write("Gradient: ",gradient)
-    st.markdown(conco, unsafe_allow_html=True)
+    conco = utility.check_con_dis_cordance(gradient,True)  
+    conco_str = utility.format_label(conco)
+    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    #st.write("Gradient: ",gradient)
+    #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
+    st.session_state.blood_pressure_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -91,6 +116,7 @@ def estimate_linear_regression_coefs(np, x, y):
   
 def plot_regression_line(x, y, b, st):
   import matplotlib.pyplot as plt  
+  plt.clf() 
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
         marker = "x", s = 30)
@@ -117,14 +143,15 @@ def get_score_description(index):
     return scores[index]
     
     
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
-    st.divider()
-    st.subheader("5. Body Mass Index (BMI) " + date_range)
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime)  
+    readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_bmi(conn,patient_id,start_date,end_date,st)
-    get_readings_for_score(conn,patient_id,start_date,end_date,st)
-    get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
+    if value > 0:
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+        
+    check_next_appointment(st,conn,patient_id,widgets,components,utility)
   
 def readings_on_table_display(readings,st,datetime):
     date, bmi, description = st.columns(3)
@@ -190,3 +217,62 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading = average_score/divider
         reading_scores = average_score_scores/divider
     return reading_scores, reading
+
+def save_to_db(conn,patient_id,reading_date,bmi,scale,score,description):
+    conn.execute(f'''
+            INSERT INTO bmi (patient_id,reading_date,bmi_reading,scale,score,description) 
+            VALUES 
+            ('{patient_id}','{reading_date}','{bmi}','{scale}','{score}','{description}')
+            ''')
+    conn.commit()    
+    
+def set_data_capture_form(conn,patient_id,st,widgets,components):   
+    ##modal widgets##
+    modal = widgets.create_modal_widget("Capture BMI reading","bmi",50,600)
+    open_modal = st.button("Capture BMI reading","bmi")
+    
+    if open_modal:
+        modal.open()
+        
+    if modal.is_open():
+       
+        with modal.container():
+            result = ''
+            mpc = ''
+            score = ''
+            scale = ''
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="bp-date")
+            bmi = st.number_input("BMI",key="bmi-bmi")
+            if st.button('Submit reading',key="bmi-submit"):
+                if bmi >= 18.5 and bmi <= 24.9:
+                    result = 'Normal'
+                    mpc = 1
+                    score = 5
+        
+                if bmi >= 25 and bmi <= 29.9:
+                    result = 'Overweight'
+                    mpc = 2
+                    score = 4
+                   
+                if bmi >= 30 and bmi <= 34.9:
+                    result = 'Obesity class 1'
+                    mpc = 3
+                    score = 3
+                    st.warning(result)        
+                if bmi >= 35 and bmi <= 40:
+                    result = 'Obesity class 2'
+                    mpc = 4
+                    score = 2
+                    st.error(result)
+                if bmi > 40 or bmi < 18.5:
+                    result = 'Extreme obesity/Underweight'
+                    mpc = 5
+                    score = 1
+                    st.error(result)
+                if not result:
+                    st.error('You have not entered valid inputs, please try again')
+                else:
+                    description = result
+                    scale = mpc
+                    save_to_db(conn,patient_id,reading_date,bmi,scale,score,description)
+                    st.success("Reading saved")

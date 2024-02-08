@@ -127,13 +127,15 @@ def get_score_description(index):
     return scores[index]
     
     
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st)
     value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
     if value > 0:
         get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+        
+    set_data_capture_form(conn,patient_id,st,widgets,components)
   
 def readings_on_table_display(readings,st,date_range):
     if len(readings)<1:
@@ -207,3 +209,64 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading = average_score/divider
         reading_scores = average_score_scores/divider
     return reading_scores, reading
+    
+def save_to_db(conn,patient_id,reading_date,dbp,sbp,mean_abp,scale,score,description,mpc):
+    conn.execute(f'''
+            INSERT INTO bp_reading (patient_id,reading_date,dbp,sbp,mean_abp,scale,score,description,mpc) 
+            VALUES 
+            ('{patient_id}','{reading_date}','{dbp}','{sbp}','{mean_abp}','{scale}','{score}','{description}','{mpc}')
+            ''')
+    conn.commit()    
+    
+def set_data_capture_form(conn,patient_id,st,widgets,components):   
+    ##modal widgets##
+    modal = widgets.create_modal_widget("Capture blood pressure reading","blood_pressure",50,600)
+    open_modal = st.button("Capture blood pressure reading","blood_pressure")
+    
+    if open_modal:
+        modal.open()
+        
+    if modal.is_open():
+       
+        with modal.container():
+            result = ''
+            mpc = ''
+            score = ''
+            scale = ''
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="bp-date")
+            systolic = st.number_input("Systolic in mm Hg",key="bp-systolic")
+            diastolic = st.number_input("Diastolic in mm Hg",key="bp-diastolic")
+            if st.button('Submit reading',key="bp-submit"):
+                if (systolic >= 100 and systolic <= 129) or (diastolic >= 60 and diastolic < 84):
+                    result = 'Normal'
+                    mpc = 1
+                    score = 5
+        
+                if (systolic >= 130 and systolic <= 139) or (diastolic >= 85 and diastolic < 89):
+                    result = 'High normal'
+                    mpc = 2
+                    score = 4
+                   
+                if (systolic >= 140 and systolic <= 159) or (diastolic >= 90 and diastolic < 99):
+                    result = 'Grade 1'
+                    mpc = 3
+                    score = 3
+                    st.warning(result)        
+                if (systolic >= 160 and systolic <= 179) or (diastolic >= 100 and diastolic < 109):
+                    result = 'Grade 2'
+                    mpc = 4
+                    score = 2
+                    st.error(result)
+                if (systolic >= 180 and diastolic >= 110) or (systolic < 100 and diastolic < 60):
+                    result = 'Grade 3/urgency'
+                    mpc = 5
+                    score = 1
+                    st.error(result)
+                if not result:
+                    st.error('You have not entered valid inputs, please try again')
+                else:
+                    description = result
+                    scale = mpc
+                    mean_abp = (2*diastolic + systolic)/3
+                    save_to_db(conn,patient_id,reading_date,diastolic,systolic,mean_abp,scale,score,description,mpc)
+                    st.success("Reading saved")

@@ -1,3 +1,17 @@
+ 
+
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
+    
+    readings = get_readings_for_display(conn,patient_id,start_date,end_date)
+    readings_on_table_display(readings,st,datetime,date_range)  
+    utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st, utility)
+    if value > 0:
+        get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+        
+    set_data_capture_form(conn,patient_id,st,widgets,components)
+    
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date,reading_category,reading_time, bgm_reading, description FROM bgm WHERE patient_id = " + str(patient_id) + ""
@@ -146,14 +160,7 @@ def get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility):
     #st.write("**TIR values**")
     st.markdown("TIR: " + tir_str,unsafe_allow_html=True)
     
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
-    readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime,date_range)  
-    utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
-    value = get_readings_for_score(conn,patient_id,start_date,end_date,st, utility)
-    if value > 0:
-        get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
-        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+
   
 def readings_on_table_display(readings,st,datetime,date_range):
     if len(readings)<1:
@@ -213,3 +220,102 @@ def get_row_data(resultset):
        high.append(2)
        very_high.append(1)
     return dates,optimal,normal,elevated,high,very_high
+
+def save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time):
+    conn.execute(f'''
+            INSERT INTO bgm (
+            patient_id, reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time
+            ) 
+            VALUES 
+            ('{patient_id}','{reading_date}','{reading_category}','{measurement_type}','{bgm_reading}','{scale}','{score}','{description}','{reading_time}')
+            ''')
+    conn.commit()    
+
+def set_data_capture_form(conn,patient_id,st,widgets,components):   
+    ##modal widgets##
+    modal = widgets.create_modal_widget("Capture blood sugar reading","blood_sugar",50,600)
+    open_modal = st.button("Capture blood sugar reading","blood_sugar")
+    
+    if open_modal:
+        modal.open()
+        
+    if modal.is_open():
+       
+        with modal.container():
+            result = ''
+            mpc = ''
+            score = ''
+            scale = ''
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD")
+            reading_time = st.time_input("Reading time",value=None)
+            option = st.selectbox(
+               "What is the time option for this reading?",
+               ("Random", "Before breakfast", "2 hours after breakfast", "Before lunch", "2 hours after lunch", "Before supper", "2 hours after supper", "Midnight"),
+               index=None,
+               placeholder="Select reading time",
+            )
+            mmol = st.number_input("BGM reading (in mmol/lit):")
+            if st.button('Submit reading'):
+                if option=='Random':
+                    if mmol >= 3.9 and mmol <= 5.5:
+                        result = 'Optimal'
+                        mpc = 1
+                        score = 5
+                        st.success(result)
+                    if mmol >= 5.6 and mmol <= 7.9:
+                        result = 'Normal'
+                        mpc = 2
+                        score = 4
+                        st.info(result)
+                    if mmol >= 8 and mmol <= 9:
+                        result = 'Elevated'
+                        mpc = 3
+                        score = 3
+                        st.warning(result)        
+                    if ((mmol >= 9.1 and mmol <= 10.4) or (mmol >= 3 and mmol <= 3.8)):
+                        result = 'High/grade 1 hypo'
+                        mpc = 4
+                        score = 2
+                        st.error(result)
+                    if mmol > 10 and mmol < 3:
+                        result = 'Very high/grade 2 hypo'
+                        mpc = 5
+                        score = 1
+                        st.error(result)
+                else:
+                    if mmol >= 3.9 and mmol <= 6:
+                        result = 'Optimal'
+                        mpc = 1
+                        score = 5
+                        st.success(result)
+                    if mmol >= 6.1 and mmol <= 6.9:
+                        result = 'Normal'
+                        mpc = 2
+                        score = 4
+                        st.info(result)
+                    if mmol >= 7 and mmol <= 10:
+                        result = 'Elevated'
+                        mpc = 3
+                        score = 3 
+                        st.warning(result)
+                    if mmol >= 10.1 and mmol <= 13.9:
+                        result = 'High/grade 1 hypo'
+                        mpc = 4
+                        score = 2
+                        st.error(result)
+                    if mmol > 13.9:
+                        result = 'Very high/grade 2 hypo'
+                        mpc = 5
+                        score = 1
+                        st.error(result)
+                if not result:
+                    st.error('You have not entered valid inputs, please try again')
+                else:
+                    reading_category = measurement_type = option
+                    bgm_reading = mmol
+                    description = result
+                    scale = mpc
+                    save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time)
+                    st.success("Reading saved")
+          
+           

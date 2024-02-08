@@ -60,7 +60,12 @@ def number_of_months(start_date,end_date):
     if (total_months>1):
         mnths = str(total_months) + " months"    
     return mnths,total_months
-
+    
+def add_date(the_date,years,months):
+    start_date = datetime.strptime(the_date, '%Y-%m-%d')
+    new_date = start_date + relativedelta.relativedelta(years=years) + relativedelta.relativedelta(months=months)
+    return new_date.strftime('%Y-%m-%d')
+   
 def patient_header_info(patient,st):    
     st.link_button("Back to list of patients", "Patients")
     patient_id = patient[0]
@@ -317,6 +322,52 @@ def plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st):
                    yaxis=dict(showgrid=True)
                    )
     st.plotly_chart(fig, use_container_width=True)
+
+def plotly_chart_lipid(conn,patient_id,start_date,end_date,st):
+    import pages.modules.lipid as lipid
+    # data
+    data = lipid.get_readings_for_graph(conn,patient_id,start_date,end_date)
+    dates,optimal,normal,elevated,high,very_high,reading = get_row_data_lipid(data)
+    if len(dates)<1:
+        st.write("Insufficient readings to generate graph")
+        return
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    
+    # Add traces
+    fig.add_trace(go.Scatter(x=dates, y=optimal,
+                        mode='lines',
+                        line=dict(color='green'),
+                        name='Optimal'))
+    fig.add_trace(go.Scatter(x=dates, y=normal,
+                        mode='lines',
+                        line=dict(color='blue'),
+                        name='Near Normal'))
+    fig.add_trace(go.Scatter(x=dates, y=elevated,
+                        mode='lines',
+                        line=dict(color='orange'),
+                        name='Borderline High'))
+    fig.add_trace(go.Scatter(x=dates, y=high,
+                        mode='lines',
+                        line=dict(color='brown'),
+                        name='High'))
+    fig.add_trace(go.Scatter(x=dates, y=very_high,
+                        mode='lines',
+                        line=dict(color='red'),
+                        name='Severely High'))
+    fig.add_trace(go.Scatter(x=dates, y=reading,
+                        mode='lines+markers',
+                        line=dict(color='magenta',width=7),
+                        name='Patient Lipid Profile Reading'))
+    fig.update_layout(title='Patient Lipid Profile performance',
+                   xaxis_title='Date',
+                   yaxis_title='Lipid profile reading in scale',
+                   xaxis=dict(showgrid=True), 
+                   yaxis=dict(showgrid=True)
+                   )
+    st.plotly_chart(fig, use_container_width=True)
+
 def plotly_chart_bmi(conn,patient_id,start_date,end_date,st):
     import pages.modules.bmi as bmi
     # data
@@ -357,7 +408,7 @@ def plotly_chart_bmi(conn,patient_id,start_date,end_date,st):
                    xaxis=dict(showgrid=True), 
                    yaxis=dict(showgrid=True)
                    )
-    st.write(fig)   
+    st.plotly_chart(fig, use_container_width=True)
 def get_row_data_blood_sugar(resultset):
     dates = list()
     optimal = list()
@@ -412,6 +463,24 @@ def get_row_data_blood_pressure(resultset):
        reading.append(row[1])
     return dates,optimal,normal,elevated,high,very_high,reading 
     
+def get_row_data_lipid(resultset):
+    dates = list()
+    optimal = list()
+    normal = list()
+    elevated = list()
+    high = list()
+    very_high = list()
+    reading = list()
+    for row in resultset:
+       dates.append(row[0])
+       optimal.append(1)
+       normal.append(2)
+       elevated.append(3)
+       high.append(4)
+       very_high.append(5)
+       reading.append(row[1])
+    return dates,optimal,normal,elevated,high,very_high,reading
+    
 def check_con_dis_cordance(b,formating=False):
     if formating:
         if b > 0:
@@ -427,6 +496,8 @@ def check_con_dis_cordance(b,formating=False):
 def format_label(label):
     return '<span style="color:green; font-weight: bold;">'+str(label)+'</span>'
     
+def format_warning(label):
+    return '<span style="color:red; font-weight: bold;">'+str(label)+'</span>'
     
 def target_summaries(pd, st):
     df = pd.DataFrame(columns=["Care Target","MPC Score","Description","Concordance"])

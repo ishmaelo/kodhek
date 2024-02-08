@@ -19,6 +19,23 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
     
+def check_next_appointment(st,conn,patient_id,widgets,components,utility):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date FROM hba1c WHERE patient_id = " + str(patient_id) + " ORDER BY reading_date DESC LIMIT 1"
+    cursor.execute(sql)
+    readings = cursor.fetchall() #database query to retrieve readings
+    last_reading = overdue = ''
+    for row in readings:
+        last_reading = row[0]    
+    years, months = utility.get_daignosis_duration(last_reading)
+    if years>0 or months>6:
+        overdue = utility.format_warning("next appointment is now overdue")
+    else:
+       next_date = utility.add_date(last_reading,0,6)
+       overdue = utility.format_label("next appointment is on " + next_date)
+    st.markdown("Last reading was in " + last_reading + ", " + overdue,unsafe_allow_html=True)
+    set_data_capture_form(conn,patient_id,st,widgets,components)
+    
 def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
     sql = "SELECT score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
@@ -125,13 +142,14 @@ def get_score_description(index):
     return scores[index]
     
 
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range):
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
     value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
     if value > 0:
         get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
+    check_next_appointment(st,conn,patient_id,widgets,components,utility)
   
 def readings_on_table_display(readings,st,date_range):
     if len(readings)<1:
@@ -205,3 +223,66 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
         reading_scores = get_score_description(math.ceil(reading_scores))
     return reading_scores, reading
+    
+def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
+    conn.execute(f'''
+            INSERT INTO hba1c (
+            patient_id, reading_date,bgm_reading,scale,score,description
+            ) 
+            VALUES 
+            ('{patient_id}','{reading_date}','{bgm_reading}','{scale}','{score}','{description}')
+            ''')
+    conn.commit()    
+    
+def set_data_capture_form(conn,patient_id,st,widgets,components):   
+    ##modal widgets##
+    modal = widgets.create_modal_widget("Capture HBA1C reading","hba1c",50,600)
+    open_modal = st.button("Capture HBA1C reading","hba1c")
+    
+    if open_modal:
+        modal.open()
+        
+    if modal.is_open():
+       
+        with modal.container():
+            result = ''
+            mpc = ''
+            score = ''
+            scale = ''
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="hba1c-date")
+            
+            mmol = st.number_input("HBA1C %:",key="hba1c-reading")
+            if st.button('Submit reading',key="hba1c-submit"):
+                if mmol >= 6 and mmol <= 7:
+                    result = 'Optimal'
+                    mpc = 1
+                    score = 5
+                    st.success(result)
+                if mmol >= 7.1 and mmol <= 7.6:
+                    result = 'Normal'
+                    mpc = 2
+                    score = 4
+                    st.info(result)
+                if mmol >= 7.7 and mmol <= 8.2:
+                    result = 'Elevated'
+                    mpc = 3
+                    score = 3
+                    st.warning(result)        
+                if mmol >= 8.3 and mmol <= 8.8:
+                    result = 'High'
+                    mpc = 4
+                    score = 2
+                    st.error(result)
+                if mmol > 8.8:
+                    result = 'Very high'
+                    mpc = 5
+                    score = 1
+                    st.error(result)
+                if not result:
+                    st.error('You have not entered valid inputs, please try again')
+                else:
+                    bgm_reading = mmol
+                    description = result
+                    scale = mpc
+                    save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
+                    st.success("Reading saved")
