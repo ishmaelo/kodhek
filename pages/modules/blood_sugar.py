@@ -1,15 +1,15 @@
  
 
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
-    
+    st.markdown("""---""")
+    st.subheader("1. Blood Glucose")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,datetime,date_range)  
     utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
     value = get_readings_for_score(conn,patient_id,start_date,end_date,st, utility)
     if value > 0:
         get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
-        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
-        
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)    
     set_data_capture_form(conn,patient_id,st,widgets,components)
     
 def get_readings_for_display(conn,patient_id,start_date,end_date):
@@ -87,10 +87,10 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     intercept, gradient = b
     conco = utility.check_con_dis_cordance(gradient,True)  
     conco_str = utility.format_label(conco)
-    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
+    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
     st.session_state.blood_sugar_gradient = gradient
     
     
@@ -113,10 +113,12 @@ def estimate_linear_regression_coefs(np, x, y):
   return  (b_0, b_1)
   
 def plot_regression_line(x, y, b, st):
-  import matplotlib.pyplot as plt  
+  import matplotlib.pyplot as plt 
+
+  #plt.figure(figsize=(1,1))
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
-        marker = "x", s = 30)
+        marker = "x", s = 10)
  
   # predicted response vector
   y_pred = b[0] + b[1]*x
@@ -127,7 +129,8 @@ def plot_regression_line(x, y, b, st):
   # putting labels
   plt.xlabel('Dates')
   plt.ylabel('BGM Scores')
-  st.pyplot(plt)
+  plt.grid()
+  st.pyplot(plt.gcf())
   #plt.show()
 
 def get_score_description(index):

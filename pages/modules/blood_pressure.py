@@ -73,10 +73,11 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd, util
     intercept, gradient = b
     conco = utility.check_con_dis_cordance(gradient,True)  
     conco_str = utility.format_label(conco)
-    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
+    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
     st.session_state.blood_pressure_gradient = gradient
     
     
@@ -123,11 +124,13 @@ def check_con_dis_cordance(b):
         return '<p style="color:red;font-weight: bold;">Discordant</p>'
   
 def get_score_description(index):
-    scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = ["Undefined","Grade 3/urgency","Grade 2","Grade 1","High Normal","Normal"]
     return scores[index]
     
     
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
+    st.markdown("""---""")
+    st.subheader("3. Blood Pressure")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_blood_pressure(conn,patient_id,start_date,end_date,st)

@@ -58,7 +58,7 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
         description = get_score_description(average_score)
         score_str = utility.format_label(str(average_score)+ ", " + description)
         st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
-    st.session_state.blood_pressure_score = average_score
+    st.session_state.bmi_score = average_score
     
     return divider
     
@@ -89,11 +89,12 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd, util
     intercept, gradient = b
     conco = utility.check_con_dis_cordance(gradient,True)  
     conco_str = utility.format_label(conco)
-    st.markdown("Concordance/Discordance: " + conco_str,unsafe_allow_html=True)
+    
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
-    st.session_state.blood_pressure_gradient = gradient
+    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
+    st.session_state.bmi_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -139,11 +140,13 @@ def check_con_dis_cordance(b):
         return '<p style="color:red;font-weight: bold;">Discordant</p>'
   
 def get_score_description(index):
-    scores = ["Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = ["Undefined","Extreme obesity/Underweight","Obesity class 2","Obesity class 1","Overweight","Normal"]
     return scores[index]
     
     
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
+    st.markdown("""---""")
+    st.subheader("5. Body Mass Index (BMI)")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     readings_on_table_display(readings,st,date_range)  
     utility.plotly_chart_bmi(conn,patient_id,start_date,end_date,st)

@@ -1,6 +1,6 @@
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_category, bgm_reading, description FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date, reading, acr, dialysis, description FROM urine WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -10,7 +10,7 @@ def get_readings_for_display(conn,patient_id,start_date,end_date):
     return cursor.fetchall() #database query to retrieve readings
 def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,scale FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,scale FROM urine WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -21,14 +21,14 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     
 def check_next_appointment(st,conn,patient_id,widgets,components,utility):
     cursor = conn.cursor()
-    sql = "SELECT reading_date FROM hba1c WHERE patient_id = " + str(patient_id) + " ORDER BY reading_date DESC LIMIT 1"
+    sql = "SELECT reading_date FROM urine WHERE patient_id = " + str(patient_id) + " ORDER BY reading_date DESC LIMIT 1"
     cursor.execute(sql)
     readings = cursor.fetchall() #database query to retrieve readings
     last_reading = overdue = ''
     for row in readings:
         last_reading = row[0]    
     years, months = utility.get_daignosis_duration(last_reading)
-    if years>0 or months>6:
+    if years>0:
         overdue = utility.format_warning("next appointment is now overdue")
     else:
        next_date = utility.add_date(last_reading,0,6)
@@ -38,7 +38,7 @@ def check_next_appointment(st,conn,patient_id,widgets,components,utility):
     
 def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
     cursor = conn.cursor()
-    sql = "SELECT score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT score FROM urine WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -60,7 +60,7 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
         description = get_score_description(average_score)
         score_str = utility.format_label(str(average_score)+ ", " + description)
         st.markdown("MPC Score: " + score_str, unsafe_allow_html=True)
-    st.session_state.hba1c_score = average_score
+    st.session_state.urine_score = average_score
     
     return divider
     
@@ -69,7 +69,7 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     import matplotlib.pyplot as plt
     
     cursor = conn.cursor()
-    sql = "SELECT reading_date,score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,score FROM urine WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -97,7 +97,7 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     #st.markdown(conco, unsafe_allow_html=True)
     plot_regression_line(dates, scores, b, st)
     st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
-    st.session_state.hba1c_gradient = gradient
+    st.session_state.urine_gradient = gradient
     
     
 def estimate_linear_regression_coefs(np, x, y):
@@ -133,22 +133,27 @@ def plot_regression_line(x, y, b, st):
  
   # putting labels
   plt.xlabel('Reading Dates')
-  plt.ylabel('HBA1C Scores')
+  plt.ylabel('Urine Dipstick Test Scores')
   st.pyplot(plt)
   #plt.show()
 
-  
+def get_all_score_description():
+    scores = ["Undefined","Very Poor","Poor","Fair","Good","Optimal","Urine Dipstick Readings","Patient Urine Dipstick Performance","Urine Dipstick reading in scale"]
+    return scores
+    
 def get_score_description(index):
-    scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
+    scores = get_all_score_description()
     return scores[index]
     
 
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
     st.markdown("""---""")
-    st.subheader("2. HBA1C")
+    st.subheader("6. Urine Dipstick Tests")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,date_range)  
-    utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
+    readings_on_table_display(readings,st,date_range)
+    data = get_readings_for_graph(conn,patient_id,start_date,end_date)
+    labels = get_all_score_description()    
+    utility.plotly_chart(data,labels,st)
     value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
     if value > 0:
         get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
@@ -158,12 +163,16 @@ def readings_on_table_display(readings,st,date_range):
     if len(readings)<1:
        st.write("Insufficient readings to display the table")
        return
-    st.write("**HBA1C Readings " + date_range + "**")
-    date, bgm, description = st.columns(3)
+    st.write("**Urine Dipstick Tests " + date_range + "**")
+    date, bgm, acr, dial, description = st.columns(5)
     with date:
        st.write("**Date**")
     with bgm:
-       st.write("**Hba1c %**")
+       st.write("**Urine Microalbumin**")
+    with acr:
+       st.write("**Albumin Creatinine Ration**")
+    with dial:
+       st.write("**Dialysis**")
     with description:
        st.write("**Description**")
     i = 0
@@ -173,9 +182,13 @@ def readings_on_table_display(readings,st,date_range):
         with date:
             st.write(row[0])
         with bgm:
-           st.write(str(row[2]))
+           st.write(str(row[1]))
+        with acr:
+           st.write(str(row[2])) 
+        with dial:
+           st.write(str(row[3]))
         with description:
-           st.write(row[3])
+           st.write(row[4])
         i += 1
        
 def get_row_data(resultset):
@@ -197,20 +210,19 @@ def get_row_data(resultset):
     
 def initial_diagnosis_correlation_readings(conn, patient_id, diagnosis_date):
     cursor = conn.cursor()
-    sql = "SELECT scale, score FROM hba1c WHERE patient_id = " + str(patient_id) + " AND reading_date = '" + str (diagnosis_date) + "'";
+    sql = "SELECT scale, score FROM urine WHERE patient_id = " + str(patient_id) + " AND reading_date = '" + str (diagnosis_date) + "'";
     cursor.execute(sql)
     rows = cursor.fetchall()
     reading = reading_scores = 0
     for row in rows:
         reading = row[0]
-        reading_scores = get_score_description(row[1])
+        reading_scores = row[1]
     return reading_scores, reading
     
     
-def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,new_date_str,initial_readings, initial_readings_scores):
-    import math
+def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,new_date_str,initial_readings, initial_readings_scores):    
     cursor = conn.cursor()
-    sql = "SELECT scale, score FROM hba1c WHERE patient_id = " + str(patient_id) + " AND reading_date BETWEEN DATE('" + str(old_date_str) + "') AND DATE('" + str(new_date_str) + "')"
+    sql = "SELECT scale, score FROM urine WHERE patient_id = " + str(patient_id) + " AND reading_date BETWEEN DATE('" + str(old_date_str) + "') AND DATE('" + str(new_date_str) + "')"
     cursor.execute(sql)
     rows = cursor.fetchall()
     reading = initial_readings
@@ -224,12 +236,12 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
     if divider > 0:
         reading = average_score/divider
         reading_scores = average_score_scores/divider
-        reading_scores = get_score_description(math.ceil(reading_scores))
     return reading_scores, reading
-    
+
+
 def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
     conn.execute(f'''
-            INSERT INTO hba1c (
+            INSERT INTO urine (
             patient_id, reading_date,bgm_reading,scale,score,description
             ) 
             VALUES 
@@ -239,8 +251,8 @@ def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
     
 def set_data_capture_form(conn,patient_id,st,widgets,components):   
     ##modal widgets##
-    modal = widgets.create_modal_widget("Capture HBA1C reading","hba1c",50,600)
-    open_modal = st.button("Capture HBA1C reading","hba1c")
+    modal = widgets.create_modal_widget("Capture Urine Dipstick Test reading","urine",50,600)
+    open_modal = st.button("Capture Urine Dipstick Test reading","urine")
     
     if open_modal:
         modal.open()
@@ -252,10 +264,10 @@ def set_data_capture_form(conn,patient_id,st,widgets,components):
             mpc = ''
             score = ''
             scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="hba1c-date")
+            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="urine-date")
             
-            mmol = st.number_input("HBA1C %:",key="hba1c-reading")
-            if st.button('Submit reading',key="hba1c-submit"):
+            mmol = st.number_input("HBA1C %:",key="urine-reading")
+            if st.button('Submit reading',key="urine-submit"):
                 if mmol >= 6 and mmol <= 7:
                     result = 'Optimal'
                     mpc = 1

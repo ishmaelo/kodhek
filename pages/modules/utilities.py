@@ -3,6 +3,15 @@ import pages.modules.hba1c as hba1c
 import pages.modules.blood_pressure as blood_pressure
 import pages.modules.lipid as lipid
 import pages.modules.bmi as bmi
+import pages.modules.urine as urine
+import pages.modules.eye as eye
+import pages.modules.monofilament as monofilament
+import pages.modules.diet as diet
+import pages.modules.physical_activity as physical_activity
+import pages.modules.education as education
+import pages.modules.comorbidity as comorbidity
+import pages.modules.health_system as health_system
+import pages.modules.socioeconomic as socioeconomic
 
 import math
 
@@ -11,7 +20,8 @@ from datetime import datetime
 from dateutil import relativedelta
 
 def set_title(st):
-    st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
+    #st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
+    st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care',layout = 'wide',initial_sidebar_state = 'collapsed')
     
 def get_database_connection():
     import sqlite3
@@ -140,7 +150,7 @@ def get_lipid_data_with_annotations(resultset):
        df.loc[len(df.index)] = new_row
     return df
     
-def get_bmi_data_with_annotations(resultset):
+def get_hba1c_data_with_annotations(resultset):
     df = pd.DataFrame(columns=["Reading date","Description","Score"])
     for row in resultset:
        new_row = [row[0], "Reading", row[3]]
@@ -188,6 +198,66 @@ def plotly_chart_together(df,st):
     import plotly.express as px
     fig = px.line(df, x="Reading date", y="Scale", color='Description',markers=True)
     st.write(fig)
+def plotly_chart(data,labels,st):
+    dates,optimal,normal,elevated,high,very_high,reading = get_row_data(data)
+    if len(dates)<1:
+       st.write("Insufficient readings to generate graph")
+       return
+    import plotly.graph_objects as go
+
+    fig = go.Figure()
+    
+    # Add traces
+    fig.add_trace(go.Scatter(x=dates, y=optimal,
+                        mode='lines',
+                        line=dict(color='green',width=3),
+                        name=labels[5]))
+    fig.add_trace(go.Scatter(x=dates, y=normal,
+                        mode='lines',
+                        line=dict(color='blue',width=3),
+                        name=labels[4]))
+    fig.add_trace(go.Scatter(x=dates, y=elevated,
+                        mode='lines',
+                        line=dict(color='orange',width=3),
+                        name=labels[3]))
+    fig.add_trace(go.Scatter(x=dates, y=high,
+                        mode='lines',
+                        line=dict(color='brown',width=3),
+                        name=labels[2]))
+    fig.add_trace(go.Scatter(x=dates, y=very_high,
+                        mode='lines',
+                        line=dict(color='red',width=3),
+                        name=labels[1]))
+    fig.add_trace(go.Scatter(x=dates, y=reading,
+                        mode='lines+markers',
+                        line=dict(color='magenta',width=7),
+                        name=labels[6]))
+    fig.update_layout(title=labels[7],
+                   xaxis_title='Date',
+                   yaxis_title=labels[8],
+                   xaxis=dict(showgrid=True), 
+                   yaxis=dict(showgrid=True)
+                   )
+    st.plotly_chart(fig, use_container_width=True) 
+    
+def get_row_data(resultset):
+    dates = list()
+    optimal = list()
+    normal = list()
+    elevated = list()
+    high = list()
+    very_high = list()
+    reading = list()
+    for row in resultset:
+       dates.append(row[0])
+       optimal.append(1)
+       normal.append(2)
+       elevated.append(3)
+       high.append(4)
+       very_high.append(5)
+       reading.append(row[1])
+    return dates,optimal,normal,elevated,high,very_high,reading
+
 def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
     import pages.modules.blood_sugar as blood_sugar
     # data
@@ -203,27 +273,27 @@ def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
     # Add traces
     fig.add_trace(go.Scatter(x=dates, y=optimal,
                         mode='lines',
-                        line=dict(color='green',width=5),
+                        line=dict(color='green',width=55),
                         name='Optimal'))
     fig.add_trace(go.Scatter(x=dates, y=normal,
                         mode='lines',
-                        line=dict(color='blue',width=6),
+                        line=dict(color='blue',width=55),
                         name='Normal'))
     fig.add_trace(go.Scatter(x=dates, y=elevated,
                         mode='lines',
-                        line=dict(color='orange',width=7),
+                        line=dict(color='orange',width=55),
                         name='Elevated'))
     fig.add_trace(go.Scatter(x=dates, y=high,
                         mode='lines',
-                        line=dict(color='brown',width=8),
+                        line=dict(color='brown',width=55),
                         name='High'))
     fig.add_trace(go.Scatter(x=dates, y=very_high,
                         mode='lines',
-                        line=dict(color='red',width=10),
+                        line=dict(color='red',width=55),
                         name='Very high'))
     fig.add_trace(go.Scatter(x=dates, y=reading,
                         mode='lines+markers',
-                        line=dict(color='magenta',width=7),
+                        line=dict(color='magenta',width=3),
                         name='Patient BGM Reading'))
     fig.update_layout(title='Blood Glucose Performance (Rated in Scale)',
                    xaxis_title='Reading date',
@@ -369,9 +439,9 @@ def plotly_chart_lipid(conn,patient_id,start_date,end_date,st):
     st.plotly_chart(fig, use_container_width=True)
 
 def plotly_chart_bmi(conn,patient_id,start_date,end_date,st):
-    import pages.modules.bmi as bmi
+    import pages.modules.eye as eye
     # data
-    data = bmi.get_readings_for_graph(conn,patient_id,start_date,end_date)
+    data = eye.get_readings_for_graph(conn,patient_id,start_date,end_date)
     dates,optimal,normal,elevated,high,very_high,reading = get_row_data_blood_pressure(data)
     import plotly.graph_objects as go
 
@@ -501,7 +571,7 @@ def format_warning(label):
     
 def target_summaries(pd, st):
     df = pd.DataFrame(columns=["Care Target","MPC Score","Description","Concordance"])
-    
+    average_score = average_gradient = 0
     #blood sugar
     blood_sugar_score = st.session_state.blood_sugar_score
     blood_sugar_gradient = st.session_state.blood_sugar_gradient
@@ -509,18 +579,139 @@ def target_summaries(pd, st):
     blood_sugar_gradient_description = check_con_dis_cordance(blood_sugar_gradient,True)
     new_row = ["Blood Sugar",blood_sugar_score,blood_sugar_score_description,blood_sugar_gradient_description]
     df.loc[len(df.index)] = new_row
+    average_score = blood_sugar_score
+    average_gradient += blood_sugar_gradient
+    
     
     #HBA1C
     hba1c_score = st.session_state.hba1c_score
     hba1c_gradient = st.session_state.hba1c_gradient
-    hba1c_score_description = hba1c.get_score_description(blood_sugar_score)
+    hba1c_score_description = hba1c.get_score_description(hba1c_score)
     hba1c_gradient_description = check_con_dis_cordance(hba1c_gradient,True)
     new_row = ["HBA1C",hba1c_score,hba1c_score_description,hba1c_gradient_description]
     df.loc[len(df.index)] = new_row
+    average_score += hba1c_score
+    average_gradient += hba1c_gradient
+    
+    
+    #BP
+    blood_pressure_score = st.session_state.blood_pressure_score
+    blood_pressure_gradient = st.session_state.blood_pressure_gradient
+    blood_pressure_score_description = blood_pressure.get_score_description(blood_pressure_score)
+    blood_pressure_gradient_description = check_con_dis_cordance(blood_pressure_gradient,True)
+    new_row = ["Blood Pressure",blood_pressure_score,blood_pressure_score_description,blood_pressure_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += blood_pressure_score
+    average_gradient += blood_pressure_gradient
+    
+    
+    #lipid
+    lipid_score = st.session_state.lipid_score
+    lipid_gradient = st.session_state.lipid_gradient
+    lipid_score_description = lipid.get_score_description(lipid_score)
+    lipid_gradient_description = check_con_dis_cordance(lipid_gradient,True)
+    new_row = ["Lipids",lipid_score,lipid_score_description,lipid_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += lipid_score
+    average_gradient += lipid_gradient
+    
+    
+    #eye
+    eye_score = st.session_state.eye_score
+    eye_gradient = st.session_state.eye_gradient
+    eye_score_description = eye.get_score_description(eye_score)
+    eye_gradient_description = check_con_dis_cordance(eye_gradient,True)
+    new_row = ["BMI",eye_score,eye_score_description,eye_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += eye_score
+    average_gradient += eye_gradient
+    
+        
+    #urine
+    urine_score = st.session_state.urine_score
+    urine_gradient = st.session_state.urine_gradient
+    urine_score_description = urine.get_score_description(blood_sugar_score)
+    urine_gradient_description = check_con_dis_cordance(urine_gradient,True)
+    new_row = ["Urine",urine_score,urine_score_description,urine_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += urine_score
+    average_gradient += urine_gradient
+    
+    #eye
+    eye_score = st.session_state.eye_score
+    eye_gradient = st.session_state.eye_gradient
+    eye_score_description = eye.get_score_description(eye_score)
+    eye_gradient_description = check_con_dis_cordance(eye_gradient,True)
+    new_row = ["Eye Tests",eye_score,eye_score_description,eye_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += eye_score
+    average_gradient += eye_gradient
+    
+    #monofilament
+    monofilament_score = st.session_state.monofilament_score
+    monofilament_gradient = st.session_state.monofilament_gradient
+    monofilament_score_description = monofilament.get_score_description(monofilament_score)
+    monofilament_gradient_description = check_con_dis_cordance(monofilament_gradient,True)
+    new_row = ["10g Monofilament",monofilament_score,monofilament_score_description,monofilament_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += monofilament_score
+    average_gradient += monofilament_gradient
+    
+    #diet
+    diet_score = st.session_state.diet_score
+    diet_gradient = st.session_state.diet_gradient
+    diet_score_description = diet.get_score_description(diet_score)
+    diet_gradient_description = check_con_dis_cordance(diet_gradient,True)
+    new_row = ["Diet",diet_score,diet_score_description,diet_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += diet_score
+    average_gradient += diet_gradient
+    
+    #physical activity
+    physical_activity_score = st.session_state.physical_activity_score
+    physical_activity_gradient = st.session_state.physical_activity_gradient
+    physical_activity_score_description = physical_activity.get_score_description(blood_sugar_score)
+    physical_activity_gradient_description = check_con_dis_cordance(physical_activity_gradient,True)
+    new_row = ["Physical Activity",physical_activity_score,physical_activity_score_description,physical_activity_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += physical_activity_score
+    average_gradient += physical_activity_gradient
+    
+    #education
+    education_score = st.session_state.education_score
+    education_gradient = st.session_state.education_gradient
+    education_score_description = education.get_score_description(education_score)
+    education_gradient_description = check_con_dis_cordance(education_gradient,True)
+    new_row = ["Education",education_score,education_score_description,education_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += education_score
+    average_gradient += education_gradient
+    
+    #comorbidity
+    comorbidity_score = st.session_state.comorbidity_score
+    comorbidity_gradient = st.session_state.comorbidity_gradient
+    comorbidity_score_description = comorbidity.get_score_description(comorbidity_score)
+    comorbidity_gradient_description = check_con_dis_cordance(comorbidity_gradient,True)
+    new_row = ["Comorbidity",comorbidity_score,comorbidity_score_description,comorbidity_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += comorbidity_score
+    average_gradient += comorbidity_gradient
+    
+    #socioeconomic
+    socioeconomic_score = st.session_state.socioeconomic_score
+    socioeconomic_gradient = st.session_state.socioeconomic_gradient
+    socioeconomic_score_description = socioeconomic.get_score_description(socioeconomic_score)
+    socioeconomic_gradient_description = check_con_dis_cordance(socioeconomic_gradient,True)
+    new_row = ["Socioeconomic",socioeconomic_score,socioeconomic_score_description,socioeconomic_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += socioeconomic_score
+    average_gradient += socioeconomic_gradient
+    
+       
     
     #Summary
-    average_score = (blood_sugar_score+hba1c_score)/2
-    average_gradient = (blood_sugar_gradient+hba1c_gradient)/2
+    average_score = average_score/14
+    average_gradient = average_gradient/14
     averages_score_description = get_score_description(math.floor(average_score))
     average_gradient_description = check_con_dis_cordance(average_gradient,True)
     
@@ -533,8 +724,8 @@ def target_summaries(pd, st):
     
     
 def target_correlations(conn, patient, pd, st):
-    df = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI"])
-    df_scores = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI"])
+    df = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI","Urine","Eye","Monofilament","Diet","Physical Activity","Education","Comorbidity","Health System","Socioeconomic"])
+    df_scores = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI","Urine","Eye","Monofilament","Diet","Physical Activity","Education","Comorbidity","Health System","Socioeconomic"])
     
     #date difference
     daignosis_date = patient[12] #diagnosis date 
@@ -545,14 +736,28 @@ def target_correlations(conn, patient, pd, st):
     
     #initial date readings
     hba1c_initial_readings_scores, hba1c_initial_readings = hba1c.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
-    lipid_initial_readings_scores, lipid_initial_readings = lipid.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
     blood_pressure_initial_readings_scores, blood_pressure_initial_readings = blood_pressure.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    lipid_initial_readings_scores, lipid_initial_readings = lipid.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
     bmi_initial_readings_scores, bmi_initial_readings = bmi.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    urine_initial_readings_scores, urine_initial_readings = urine.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    eye_initial_readings_scores, eye_initial_readings = eye.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    monofilament_initial_readings_scores, monofilament_initial_readings = monofilament.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    diet_initial_readings_scores, diet_initial_readings = diet.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    physical_activity_initial_readings_scores, physical_activity_initial_readings = physical_activity.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    education_initial_readings_scores, education_initial_readings = education.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    comorbidity_initial_readings_scores, comorbidity_initial_readings = comorbidity.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    health_system_initial_readings_scores, health_system_initial_readings = health_system.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
+    socioeconomic_initial_readings_scores, socioeconomic_initial_readings = socioeconomic.initial_diagnosis_correlation_readings(conn, patient[0], daignosis_date)
     daignosis_date_str = "As at " + str(daignosis_date)
     
     #add the date readings into the datframe
-    new_row = [daignosis_date,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings]
-    new_row_scores = [daignosis_date,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores]
+    new_row = [daignosis_date,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings,\
+    urine_initial_readings,eye_initial_readings,monofilament_initial_readings,diet_initial_readings,physical_activity_initial_readings,\
+    education_initial_readings,comorbidity_initial_readings,health_system_initial_readings,socioeconomic_initial_readings]
+    
+    new_row_scores = [daignosis_date,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores,\
+    urine_initial_readings_scores,eye_initial_readings_scores,monofilament_initial_readings_scores,diet_initial_readings_scores,physical_activity_initial_readings_scores,\
+    education_initial_readings_scores,comorbidity_initial_readings_scores,health_system_initial_readings_scores,socioeconomic_initial_readings_scores]
     
     df.loc[len(df.index)] = new_row
     df_scores.loc[len(df_scores.index)] = new_row_scores
@@ -572,12 +777,25 @@ def target_correlations(conn, patient, pd, st):
         lipid_initial_readings_scores, lipid_initial_readings = lipid.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,lipid_initial_readings, lipid_initial_readings_scores)
         blood_pressure_initial_readings_scores, blood_pressure_initial_readings = blood_pressure.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,blood_pressure_initial_readings, blood_pressure_initial_readings_scores)
         bmi_initial_readings_scores, bmi_initial_readings = bmi.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,bmi_initial_readings, bmi_initial_readings_scores)
+        urine_initial_readings_scores, urine_initial_readings = urine.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,urine_initial_readings, urine_initial_readings_scores)
+        eye_initial_readings_scores, eye_initial_readings = eye.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,eye_initial_readings, eye_initial_readings_scores)
+        monofilament_initial_readings_scores, monofilament_initial_readings = monofilament.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,monofilament_initial_readings, monofilament_initial_readings_scores)
+        diet_initial_readings_scores, diet_initial_readings = diet.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,diet_initial_readings, diet_initial_readings_scores)
+        physical_activity_initial_readings_scores, physical_activity_initial_readings = physical_activity.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,physical_activity_initial_readings, physical_activity_initial_readings_scores)
+        education_initial_readings_scores, education_initial_readings = education.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,education_initial_readings, education_initial_readings_scores)
+        comorbidity_initial_readings_scores, comorbidity_initial_readings = comorbidity.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,comorbidity_initial_readings, comorbidity_initial_readings_scores)
+        health_system_initial_readings_scores, health_system_initial_readings = health_system.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,health_system_initial_readings, health_system_initial_readings_scores)
+        socioeconomic_initial_readings_scores, socioeconomic_initial_readings = socioeconomic.initial_diagnosis_correlation_readings_more(conn, patient[0], old_date_str,new_date_str,socioeconomic_initial_readings, socioeconomic_initial_readings_scores)
         
         #add the date readings into the datframe
-        new_row = [new_date_str,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings]
+        new_row = [new_date_str,hba1c_initial_readings,blood_pressure_initial_readings,lipid_initial_readings,bmi_initial_readings,\
+        urine_initial_readings,eye_initial_readings,monofilament_initial_readings,diet_initial_readings,physical_activity_initial_readings,\
+        education_initial_readings,comorbidity_initial_readings,health_system_initial_readings,socioeconomic_initial_readings]
         df.loc[len(df.index)] = new_row
         
-        new_row_scores = [new_date_str,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores]
+        new_row_scores = [new_date_str,hba1c_initial_readings_scores,blood_pressure_initial_readings_scores,lipid_initial_readings_scores,bmi_initial_readings_scores,\
+        urine_initial_readings_scores,eye_initial_readings_scores,monofilament_initial_readings_scores,diet_initial_readings_scores,physical_activity_initial_readings_scores,\
+        education_initial_readings_scores,comorbidity_initial_readings_scores,health_system_initial_readings_scores,socioeconomic_initial_readings_scores]
         df_scores.loc[len(df_scores.index)] = new_row_scores
     
         #progress date
@@ -611,18 +829,22 @@ def logistic_regression(df_scores, st, pd):
     from statsmodels.miscmodels.ordinal_model import OrderedModel
     
     #convert to categorical
-    cols = ['HBA1C']
-    df_scores[cols] = df_scores[cols].astype('category')
+    cols1 = ['HBA1C']
+    df_scores[cols1] = df_scores[cols1].astype('category')
+    
+    #convert to float
+    cols2 = ["Blood Pressure","Lipids","BMI","Urine","Eye","Monofilament","Diet","Physical Activity","Education","Comorbidity","Health System","Socioeconomic"]
+    df_scores[cols2] = df_scores[cols2].astype('float')
     
     import numpy as np
     #data types
-    st.write(df_scores.dtypes)
+    #st.write(df_scores.dtypes)
     
     
     #st.write(df_scores['HBA1C'].dtype)
 
     # Select features and target variable
-    X = df_scores[["Blood Pressure","Lipids","BMI"]]  # Replace with your feature names
+    X = df_scores[["Blood Pressure","Lipids","BMI","Urine","Eye","Monofilament","Diet","Physical Activity","Education","Comorbidity","Health System","Socioeconomic"]]  # Replace with your feature names
     y = df_scores["HBA1C"]
     
     #st.write(df_scores['HBA1C'])
