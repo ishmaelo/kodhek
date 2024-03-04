@@ -62,12 +62,15 @@ def display_patient(patient):
         unsafe_allow_html=True,
     )
    
+    compute = 1
     col1.write("Select a range of reading dates")
     start = col2.date_input("From",format="YYYY-MM-DD",key="start")
     end = col3.date_input("To",format="YYYY-MM-DD",key="end")
     date_range = " (Latest Readings)"
     col4.markdown("<br/>",unsafe_allow_html=True)
-    st.header("Part I - Analysis of the individual Care Target")
+    if not compute:
+        st.header("Part I - Analysis of the individual Care Target")
+   
     
     if col4.button('Load readings for the selected date range',type="primary"):
         start_date = str(st.session_state.start)
@@ -77,53 +80,53 @@ def display_patient(patient):
         st.markdown('Duration of the analysis: '+ mnths,unsafe_allow_html=True)
         date_range = " (Readings between " + str (start_date) + " and " + str(end_date) + ")"
         #with st.expander("**1. Blood Sugar**"):
-        blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
+        blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
         #with st.expander("**2. HBA1C**"):
-        hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
+        hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
         #with st.expander("**3. Blood Pressure**"):
-        blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
+        blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
         #with st.expander("**4. Lipids**"):
-        lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
+        lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
         #with st.expander("**5. BMI**"):
-        bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        urine.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        eye.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        monofilament.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        diet.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        physical_activity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        education.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        comorbidity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        health_system.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
-        socioeconomic.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components)
+        bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        urine.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        eye.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        monofilament.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        diet.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        physical_activity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        education.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        comorbidity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        health_system.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
+        socioeconomic.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute)
     else:
         #with st.expander("**1. Blood Sugar**"):
-        blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets, components)
+        blood_sugar.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
         #with st.expander("**2. HBA1C**"):
-        hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        hba1c.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
         #with st.expander("**3. Blood Pressure**"):
-        blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        blood_pressure.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
         #with st.expander("**4. Lipids**"):
-        lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        lipid.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
         #with st.expander("**5. BMI**"):
-        bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        urine.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        eye.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        monofilament.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        diet.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        physical_activity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        education.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        comorbidity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        health_system.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
-        socioeconomic.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components)
+        bmi.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        urine.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        eye.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        monofilament.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        diet.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        physical_activity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        education.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        comorbidity.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        health_system.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
+        socioeconomic.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
     
-    st.header("Part II - Summary of all Care Targets with the Final MPC Score")
-    utility.target_summaries(pd,st)
+    st.header("Summary of all Care Targets with the Final MPC Score")
+    utility.target_summaries(pd,st,patient_id)
     
-    st.header("Part III - Corelation between HBA1C (dependent variable) and the other Care Targets [ from scale ]")
+    st.header("Corelation between HBA1C (dependent variable) and the other Care Targets")
     utility.target_correlations(conn, patient,pd,st)
   
 # retrieve patient id via URL   
-patient_id = utility.get_patient_id_via_url(st)
+patient_id, target = utility.get_patient_id_via_url(st)
  
 # display patient readings if the patient id is not null
 if patient_id:

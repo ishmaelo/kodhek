@@ -36,10 +36,13 @@ def get_patient(conn,patient_id):
     return result
 def get_patient_id_via_url(st):
     patient_id = ''
+    target = ''
     qp = st.experimental_get_query_params()
     if "patient" in qp:
         patient_id = qp['patient'][0]
-    return patient_id
+    if "target" in qp:
+        target = qp['target'][0]
+    return patient_id, target
 
 
 def get_age(birth_date):
@@ -273,23 +276,23 @@ def plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st):
     # Add traces
     fig.add_trace(go.Scatter(x=dates, y=optimal,
                         mode='lines',
-                        line=dict(color='green',width=55),
+                        line=dict(color='green',width=5),
                         name='Optimal'))
     fig.add_trace(go.Scatter(x=dates, y=normal,
                         mode='lines',
-                        line=dict(color='blue',width=55),
+                        line=dict(color='blue',width=5),
                         name='Normal'))
     fig.add_trace(go.Scatter(x=dates, y=elevated,
                         mode='lines',
-                        line=dict(color='orange',width=55),
+                        line=dict(color='orange',width=5),
                         name='Elevated'))
     fig.add_trace(go.Scatter(x=dates, y=high,
                         mode='lines',
-                        line=dict(color='brown',width=55),
+                        line=dict(color='brown',width=5),
                         name='High'))
     fig.add_trace(go.Scatter(x=dates, y=very_high,
                         mode='lines',
-                        line=dict(color='red',width=55),
+                        line=dict(color='red',width=5),
                         name='Very high'))
     fig.add_trace(go.Scatter(x=dates, y=reading,
                         mode='lines+markers',
@@ -569,8 +572,10 @@ def format_label(label):
 def format_warning(label):
     return '<span style="color:red; font-weight: bold;">'+str(label)+'</span>'
     
-def target_summaries(pd, st):
+def target_summaries(pd, st, patient_id):
     df = pd.DataFrame(columns=["Care Target","MPC Score","Description","Concordance"])
+  
+        
     average_score = average_gradient = 0
     #blood sugar
     blood_sugar_score = st.session_state.blood_sugar_score
@@ -581,6 +586,8 @@ def target_summaries(pd, st):
     df.loc[len(df.index)] = new_row
     average_score = blood_sugar_score
     average_gradient += blood_sugar_gradient
+    
+   
     
     
     #HBA1C
@@ -614,6 +621,16 @@ def target_summaries(pd, st):
     df.loc[len(df.index)] = new_row
     average_score += lipid_score
     average_gradient += lipid_gradient
+    
+    #BMI
+    bmi_score = st.session_state.bmi_score
+    bmi_gradient = st.session_state.bmi_gradient
+    bmi_score_description = bmi.get_score_description(bmi_score)
+    bmi_gradient_description = check_con_dis_cordance(bmi_gradient,True)
+    new_row = ["BMI",bmi_score,bmi_score_description,bmi_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += bmi_score
+    average_gradient += bmi_gradient
     
     
     #eye
@@ -687,6 +704,16 @@ def target_summaries(pd, st):
     average_score += education_score
     average_gradient += education_gradient
     
+    #health system
+    health_system_score = st.session_state.health_system_score
+    health_system_gradient = st.session_state.health_system_gradient
+    health_system_score_description = health_system.get_score_description(health_system_score)
+    health_system_gradient_description = check_con_dis_cordance(health_system_gradient,True)
+    new_row = ["Health System",health_system_score,health_system_score_description,health_system_gradient_description]
+    df.loc[len(df.index)] = new_row
+    average_score += health_system_score
+    average_gradient += health_system_gradient
+    
     #comorbidity
     comorbidity_score = st.session_state.comorbidity_score
     comorbidity_gradient = st.session_state.comorbidity_gradient
@@ -707,21 +734,195 @@ def target_summaries(pd, st):
     average_score += socioeconomic_score
     average_gradient += socioeconomic_gradient
     
-       
-    
     #Summary
-    average_score = average_score/14
+    average_score = math.ceil(average_score/14)
     average_gradient = average_gradient/14
     averages_score_description = get_score_description(math.floor(average_score))
     average_gradient_description = check_con_dis_cordance(average_gradient,True)
     
     
-    new_row = ["Overall",average_score,averages_score_description,average_gradient_description]
-    df.loc[len(df.index)] = new_row
+    
+    #new_row = ["Overall",average_score,averages_score_description,average_gradient_description]
+    #df.loc[len(df.index)] = new_row
+    
+    st.write("Generally, the patient is " + str(average_gradient_description.lower()) + " with treatement, rated to have " + str(averages_score_description.lower()) + ", with  a score of " + str(average_score) + " out of 5.")
     
     df = df.set_index('Care Target')
-    st.write(df)
+    #st.write(df,use_container_width=True)
     
+    df = df.drop(columns=["Description","Concordance"])
+    
+    #st.bar_chart(df)
+    
+    target,score,description,concordance,button = st.columns(5)
+    
+    with target:
+        st.write("**Care Target**")
+    with score:
+        st.write("**MPC Score (out of 5)**")
+    with description:
+        st.write("**Description**")
+    with concordance:
+        st.write("**Concordance**")
+    with button:
+        st.write("**Action**")
+    
+    with target:
+        st.write("1. Blood Sugar")
+    with score:
+        st.write(str(blood_sugar_score))
+    with description:
+        st.write(blood_sugar_score_description)
+    with concordance:
+        st.write(blood_sugar_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=blood_sugar)")
+        
+    with target:
+        st.write("2. HBA1C")
+    with score:
+        st.write(str(hba1c_score))
+    with description:
+        st.write(hba1c_score_description)
+    with concordance:
+        st.write(hba1c_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=hba1c)")
+        
+    with target:
+        st.write("3. Blood Pressure")
+    with score:
+        st.write(str(blood_pressure_score))
+    with description:
+        st.write(blood_pressure_score_description)
+    with concordance:
+        st.write(blood_pressure_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=blood_pressure)")
+    
+    with target:
+        st.write("4. Lipids")
+    with score:
+        st.write(str(lipid_score))
+    with description:
+        st.write(lipid_score_description)
+    with concordance:
+        st.write(lipid_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=lipid)")
+        
+    with target:
+        st.write("5. BMI")
+    with score:
+        st.write(str(bmi_score))
+    with description:
+        st.write(bmi_score_description)
+    with concordance:
+        st.write(bmi_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=bmi)")
+        
+    with target:
+        st.write("6. Urine")
+    with score:
+        st.write(str(urine_score))
+    with description:
+        st.write(urine_score_description)
+    with concordance:
+        st.write(urine_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=urine)")
+        
+    with target:
+        st.write("7. Eye")
+    with score:
+        st.write(str(eye_score))
+    with description:
+        st.write(eye_score_description)
+    with concordance:
+        st.write(eye_gradient_description)    
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=eye)")
+        
+    with target:
+        st.write("8. Monofilament")
+    with score:
+        st.write(str(monofilament_score))
+    with description:
+        st.write(monofilament_score_description)
+    with concordance:
+        st.write(monofilament_gradient_description)        
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=monofilament)")
+        
+    with target:
+        st.write("9. Diet")
+    with score:
+        st.write(str(diet_score))
+    with description:
+        st.write(diet_score_description)
+    with concordance:
+        st.write(diet_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=diet)")
+        
+    with target:
+        st.write("10. Physical Activity")
+    with score:
+        st.write(str(physical_activity_score))
+    with description:
+        st.write(physical_activity_score_description)
+    with concordance:
+        st.write(physical_activity_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=physical_activity)")
+        
+    with target:
+        st.write("11. Education")
+    with score:
+        st.write(str(education_score))
+    with description:
+        st.write(education_score_description)
+    with concordance:
+        st.write(education_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=education)")
+        
+    with target:
+        st.write("12. Comorbidity")
+    with score:
+        st.write(str(comorbidity_score))
+    with description:
+        st.write(comorbidity_score_description)
+    with concordance:
+        st.write(comorbidity_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=comorbidity)")
+       
+        
+    with target:
+        st.write("13. Health System")
+    with score:
+        st.write(str(health_system_score))
+    with description:
+        st.write(health_system_score_description)
+    with concordance:
+        st.write(health_system_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=health_system)")
+        
+    with target:
+        st.write("14. Socioeconomic")
+    with score:
+        st.write(str(socioeconomic_score))
+    with description:
+        st.write(socioeconomic_score_description)
+    with concordance:
+        st.write(socioeconomic_gradient_description)
+    with button:
+        st.write("[view more](Data_analysis_II?patient="+ str(patient_id) + "&target=socioeconomic)")
+
+
     
 def target_correlations(conn, patient, pd, st):
     df = pd.DataFrame(columns=["Period/Date","HBA1C","Blood Pressure","Lipids","BMI","Urine","Eye","Monofilament","Diet","Physical Activity","Education","Comorbidity","Health System","Socioeconomic"])
@@ -763,12 +964,12 @@ def target_correlations(conn, patient, pd, st):
     df_scores.loc[len(df_scores.index)] = new_row_scores
     
     #subsequent readings
-    phases = math.ceil(months/3)+1
+    phases = math.ceil(months/12)
     old_date = datetime.strptime(daignosis_date, '%Y-%m-%d')
     for phase in range(phases):
         old_date_str = old_date.strftime('%Y-%m-%d')
         new_daignosis_date = datetime.strptime(old_date_str, '%Y-%m-%d')
-        new_date = pd.to_datetime(old_date_str)+pd.DateOffset(months=3)
+        new_date = pd.to_datetime(old_date_str)+pd.DateOffset(months=12)
         if new_date > pd.Timestamp(today_date):
             new_date = pd.to_datetime(today)
         new_date_str = new_date.strftime('%Y-%m-%d')
@@ -804,10 +1005,13 @@ def target_correlations(conn, patient, pd, st):
     df = df.set_index('Period/Date')
     df_scores = df_scores.set_index('Period/Date')
     
+    st.write("Dataset")
     st.write(df)
+    st.write("Correlation Matrix")
     st.write(df.corr(method='pearson'))
     
     ## Proceed to Logistic Regression with the same dataset
+    #st.write("Dataset")
     logistic_regression(df_scores, st, pd)
     
 def target_correlations_initial_readings(patient, pd, st):
@@ -823,7 +1027,8 @@ def target_correlations_initial_readings(patient, pd, st):
     
     
 def logistic_regression(df_scores, st, pd):
-    st.subheader("Part IV - Logistic Regression between Care Targets (independent variables) and HBA1C (dependent variable) [from scores]")
+    st.subheader("Logistic Regression between Care Targets (independent variables) and HBA1C (dependent variable)")
+    st.write("Dataset")
     st.write(df_scores)
     #from ordinal import OrderedLogit
     from statsmodels.miscmodels.ordinal_model import OrderedModel
@@ -837,6 +1042,7 @@ def logistic_regression(df_scores, st, pd):
     df_scores[cols2] = df_scores[cols2].astype('float')
     
     import numpy as np
+    import pandas as pd
     #data types
     #st.write(df_scores.dtypes)
     
@@ -852,8 +1058,7 @@ def logistic_regression(df_scores, st, pd):
     # Fit the ordinal regression model
     model = OrderedModel(y, X, distr='logit',hasconst=False)
     res_log = model.fit(method='bfgs', disp=False)
-    res_log.summary()
-   
+      
     
     #st.write(regr)
 
@@ -870,7 +1075,19 @@ def logistic_regression(df_scores, st, pd):
     #y_pred = model.predict(X_test)
 
     # Print model coefficients and intercept
-    st.write(res_log.summary())
+    #st.write(res_log.summary())
     #st.write("Intercept:", model.intercept_)
+    
+    df = pd.read_html(res_log.summary().tables[1].as_html(),header=0,index_col=0)[0]
+    
+    #formula
+    
+    formula = "Y-Glycaemia=" 
+    
+    a=df['coef'].values[1]
+    bp=df['coef'].values[0]
+    
+    st.write("Y-Glycaemia = ",df['coef'].values[0],"Blood Pressure + ",df['coef'].values[1],"Lipids + ",df['coef'].values[2],"BMI + ",df['coef'].values[3],"Urine + ",df['coef'].values[4],"Eye + ",\
+    df['coef'].values[5],"Monofilament + ",df['coef'].values[6],"Diet + ",df['coef'].values[7],"Physical Activity + ",df['coef'].values[8],"Education + ",df['coef'].values[10],"Comorbidity + ",df['coef'].values[11],"Health System + ",df['coef'].values[12],"Socioeconomic")
     
     

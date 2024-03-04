@@ -1,16 +1,20 @@
  
 
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
-    st.markdown("""---""")
-    st.subheader("1. Blood Glucose")
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute):
+    if not compute:
+        st.markdown("""---""")
+        st.subheader("1. Blood Glucose")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime,date_range)  
-    utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
-    value = get_readings_for_score(conn,patient_id,start_date,end_date,st, utility)
+    if not compute:
+        readings_on_table_display(readings,st,datetime,date_range)  
+        utility.plotly_chart_blood_sugar(conn,patient_id,start_date,end_date,st)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute)
     if value > 0:
-        get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
-        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)    
-    set_data_capture_form(conn,patient_id,st,widgets,components)
+        if not compute:
+            get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute)    
+    if not compute:
+        set_data_capture_form(conn,patient_id,st,widgets,components)
     
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
@@ -33,7 +37,7 @@ def get_readings_for_graph(conn,patient_id,start_date,end_date):
     cursor.execute(sql)
     return cursor.fetchall() #database query to retrieve readings
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute):
     cursor = conn.cursor()
     sql = "SELECT score FROM bgm WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -55,12 +59,13 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
         #st.write("**MPC Scoring**")
         description = get_score_description(average_score)
         score_str = utility.format_label(str(average_score)+ ", " + description)
-        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
+        if not compute:
+            st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
     st.session_state.blood_sugar_score = average_score
     
     return divider
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute):
     import numpy as np
     import matplotlib.pyplot as plt
     
@@ -89,8 +94,10 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     conco_str = utility.format_label(conco)
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
-    plot_regression_line(dates, scores, b, st)
-    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
+    
+    if not compute:
+        plot_regression_line(dates, scores, b, st)
+        st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
     st.session_state.blood_sugar_gradient = gradient
     
     
@@ -115,7 +122,7 @@ def estimate_linear_regression_coefs(np, x, y):
 def plot_regression_line(x, y, b, st):
   import matplotlib.pyplot as plt 
 
-  #plt.figure(figsize=(1,1))
+  plt.title("Graph tracking the trend of blood sugar over time")
   # plotting the actual points as scatter plot
   plt.scatter(x, y, color = "b",
         marker = "x", s = 10)

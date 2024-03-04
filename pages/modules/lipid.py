@@ -35,7 +35,7 @@ def check_next_appointment(st,conn,patient_id,widgets,components,utility):
     st.markdown("Last reading was in " + last_reading + ", " + overdue,unsafe_allow_html=True)
     set_data_capture_form(conn,patient_id,st,widgets,components)
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute):
     cursor = conn.cursor()
     sql = "SELECT score FROM patient_lipid WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -57,12 +57,13 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
         #st.write("**MPC Scoring**")
         description = get_score_description(average_score)
         score_str = utility.format_label(str(average_score)+ ", " + description)
-        st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
+        if not compute:
+            st.markdown("MPC Score: " +  score_str, unsafe_allow_html=True)
     st.session_state.lipid_score = average_score
     
     return divider
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute):
     import numpy as np
     import matplotlib.pyplot as plt
     
@@ -92,8 +93,9 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
    
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
-    plot_regression_line(dates, scores, b, st)
-    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
+    if not compute:
+        plot_regression_line(dates, scores, b, st)
+        st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
     st.session_state.lipid_gradient = gradient
     
     
@@ -144,16 +146,19 @@ def get_score_description(index):
     return scores[index]
     
     
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
-    st.markdown("""---""")
-    st.subheader("4. Lipids")
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute):
+    if not compute:
+        st.markdown("""---""")
+        st.subheader("4. Lipids")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,datetime)  
-    utility.plotly_chart_lipid(conn,patient_id,start_date,end_date,st)
-    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
+    if not compute:
+        readings_on_table_display(readings,st,datetime)  
+        utility.plotly_chart_lipid(conn,patient_id,start_date,end_date,st)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute)
     if value > 0:
-        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
-    check_next_appointment(st,conn,patient_id,widgets,components,utility)
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute)
+    if not compute:    
+        check_next_appointment(st,conn,patient_id,widgets,components,utility)
   
 def readings_on_table_display(readings,st,datetime):
     date,tg,tc,ldl,hdl,description = st.columns(6)
@@ -208,7 +213,7 @@ def initial_diagnosis_correlation_readings(conn, patient_id, diagnosis_date):
     sql = "SELECT scale, score FROM patient_lipid WHERE patient_id = " + str(patient_id) + " AND reading_date = '" + str (diagnosis_date) + "'";
     cursor.execute(sql)
     rows = cursor.fetchall()
-    reading = reading_scores = 0
+    reading = reading_scores = 1
     for row in rows:
         reading = row[0]
         reading_scores = row[1]
@@ -221,6 +226,11 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
     cursor.execute(sql)
     rows = cursor.fetchall()
     reading = initial_readings
+    if initial_readings_scores<=3:
+        initial_readings_scores = initial_readings_scores - 0.01
+    else:
+        if initial_readings_scores<5:
+            initial_readings_scores = initial_readings_scores + 0.01
     reading_scores = initial_readings_scores
     divider = average_score = average_score_scores = 0
     for row in rows:

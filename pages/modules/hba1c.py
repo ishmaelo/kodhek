@@ -1,3 +1,16 @@
+def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute):
+    if not compute:
+        st.markdown("""---""")
+        st.subheader("2. HBA1C")
+    readings = get_readings_for_display(conn,patient_id,start_date,end_date)
+    if not compute:
+        readings_on_table_display(readings,st,date_range)  
+        utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
+    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute)
+    if value > 0:
+        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute)
+    if not compute:
+        check_next_appointment(st,conn,patient_id,widgets,components,utility)
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date,reading_category, bgm_reading, description FROM hba1c WHERE patient_id = " + str(patient_id) + ""
@@ -36,7 +49,7 @@ def check_next_appointment(st,conn,patient_id,widgets,components,utility):
     st.markdown("Last reading was in " + last_reading + ", " + overdue,unsafe_allow_html=True)
     set_data_capture_form(conn,patient_id,st,widgets,components)
     
-def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
+def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility,compute):
     cursor = conn.cursor()
     sql = "SELECT score FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
@@ -59,12 +72,13 @@ def get_readings_for_score(conn,patient_id,start_date,end_date,st,utility):
         #st.write("**MPC Scoring**")
         description = get_score_description(average_score)
         score_str = utility.format_label(str(average_score)+ ", " + description)
-        st.markdown("MPC Score: " + score_str, unsafe_allow_html=True)
+        if not compute:
+            st.markdown("MPC Score: " + score_str, unsafe_allow_html=True)
     st.session_state.hba1c_score = average_score
     
     return divider
     
-def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility):
+def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute):
     import numpy as np
     import matplotlib.pyplot as plt
     
@@ -95,8 +109,9 @@ def get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utili
     
     #st.write("Gradient: ",gradient)
     #st.markdown(conco, unsafe_allow_html=True)
-    plot_regression_line(dates, scores, b, st)
-    st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
+    if not compute:
+        plot_regression_line(dates, scores, b, st)
+        st.markdown("Concordance: " + conco_str,unsafe_allow_html=True)
     st.session_state.hba1c_gradient = gradient
     
     
@@ -141,19 +156,7 @@ def plot_regression_line(x, y, b, st):
 def get_score_description(index):
     scores = ["Undefined","Very high/Grade 2 hypo","High/Grade 1 hypo","Elevated","Normal","Optimal"]
     return scores[index]
-    
-
-def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components):
-    st.markdown("""---""")
-    st.subheader("2. HBA1C")
-    readings = get_readings_for_display(conn,patient_id,start_date,end_date)
-    readings_on_table_display(readings,st,date_range)  
-    utility.plotly_chart_hba1c(conn,patient_id,start_date,end_date,st)
-    value = get_readings_for_score(conn,patient_id,start_date,end_date,st,utility)
-    if value > 0:
-        get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility)
-    check_next_appointment(st,conn,patient_id,widgets,components,utility)
-  
+     
 def readings_on_table_display(readings,st,date_range):
     if len(readings)<1:
        st.write("Insufficient readings to display the table")
@@ -200,10 +203,12 @@ def initial_diagnosis_correlation_readings(conn, patient_id, diagnosis_date):
     sql = "SELECT scale, score FROM hba1c WHERE patient_id = " + str(patient_id) + " AND reading_date = '" + str (diagnosis_date) + "'";
     cursor.execute(sql)
     rows = cursor.fetchall()
-    reading = reading_scores = 0
+    reading_scores = 1
+    reading = 0
     for row in rows:
         reading = row[0]
-        reading_scores = get_score_description(row[1])
+        #reading_scores = get_score_description(row[1])
+        reading_scores = row[1]
     return reading_scores, reading
     
     
@@ -214,6 +219,11 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
     cursor.execute(sql)
     rows = cursor.fetchall()
     reading = initial_readings
+    if initial_readings_scores<=3:
+        initial_readings_scores = initial_readings_scores - 0.01
+    else:
+        if initial_readings_scores<5:
+            initial_readings_scores = initial_readings_scores + 0.01
     reading_scores = initial_readings_scores
     divider = average_score = average_score_scores = 0
     for row in rows:
@@ -224,7 +234,6 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
     if divider > 0:
         reading = average_score/divider
         reading_scores = average_score_scores/divider
-        reading_scores = get_score_description(math.ceil(reading_scores))
     return reading_scores, reading
     
 def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
