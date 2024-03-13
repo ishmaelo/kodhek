@@ -32,6 +32,39 @@ utility.set_title(st) #Title of the page
 ### display patient medical readings ###
 def display_patient(patient):
     utility.patient_header_info(patient,st) #header information having patient name, gender, date of birth, etc
+    
+    
+    
+    with st.expander("**Capture readings**"):
+        
+        blood_sugar.set_data_capture_form(conn,patient_id,st,widgets,components)
+    
+        hba1c.set_data_capture_form(conn,patient_id,st,widgets,components)
+   
+        blood_pressure.set_data_capture_form(conn,patient_id,st,widgets,components)
+  
+        lipid.set_data_capture_form(conn,patient_id,st,widgets,components)
+   
+        bmi.set_data_capture_form(conn,patient_id,st,widgets,components)
+   
+        urine.set_data_capture_form(conn,patient_id,st,widgets,components)    
+  
+        eye.set_data_capture_form(conn,patient_id,st,widgets,components)    
+    
+        monofilament.set_data_capture_form(conn,patient_id,st,widgets,components)
+  
+        diet.set_data_capture_form(conn,patient_id,st,widgets,components)    
+ 
+        physical_activity.set_data_capture_form(conn,patient_id,st,widgets,components)    
+   
+        education.set_data_capture_form(conn,patient_id,st,widgets,components)
+
+        comorbidity.set_data_capture_form(conn,patient_id,st,widgets,components)
+   
+        health_system.set_data_capture_form(conn,patient_id,st,widgets,components)
+ 
+        socioeconomic.set_data_capture_form(conn,patient_id,st,widgets,components)
+    
     col1, col2, col3, col4 = st.columns([1,1,1,1])
     col1.markdown("<br/>",unsafe_allow_html=True)
     st.markdown(
@@ -63,7 +96,7 @@ def display_patient(patient):
     )
    
     compute = 1
-    col1.write("Select a range of reading dates")
+    col1.markdown("**Select date range**", unsafe_allow_html=True)
     start = col2.date_input("From",format="YYYY-MM-DD",key="start")
     end = col3.date_input("To",format="YYYY-MM-DD",key="end")
     date_range = " (Latest Readings)"
@@ -72,6 +105,8 @@ def display_patient(patient):
         st.header("Part I - Analysis of the individual Care Target")
    
     
+        
+        
     if col4.button('Load readings for the selected date range',type="primary"):
         start_date = str(st.session_state.start)
         end_date = str(st.session_state.end)
@@ -119,8 +154,11 @@ def display_patient(patient):
         health_system.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
         socioeconomic.load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,'','',date_range,widgets,components,compute)
     
+    
+        
     st.header("Summary of all Care Targets with the Final MPC Score")
     utility.target_summaries(pd,st,patient_id)
+    
     
     st.header("Corelation between HBA1C (dependent variable) and the other Care Targets")
     utility.target_correlations(conn, patient,pd,st)

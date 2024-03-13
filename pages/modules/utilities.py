@@ -1028,7 +1028,7 @@ def target_correlations_initial_readings(patient, pd, st):
     
 def logistic_regression(df_scores, st, pd):
     st.subheader("Logistic Regression between Care Targets (independent variables) and HBA1C (dependent variable)")
-    st.write("Dataset")
+    st.markdown("**Dataset**",unsafe_allow_html=True)
     st.write(df_scores)
     #from ordinal import OrderedLogit
     from statsmodels.miscmodels.ordinal_model import OrderedModel
@@ -1081,13 +1081,82 @@ def logistic_regression(df_scores, st, pd):
     df = pd.read_html(res_log.summary().tables[1].as_html(),header=0,index_col=0)[0]
     
     #formula
-    
-    formula = "Y-Glycaemia=" 
-    
+    st.markdown("**The Model**",unsafe_allow_html=True)
+   
     a=df['coef'].values[1]
     bp=df['coef'].values[0]
     
-    st.write("Y-Glycaemia = ",df['coef'].values[0],"Blood Pressure + ",df['coef'].values[1],"Lipids + ",df['coef'].values[2],"BMI + ",df['coef'].values[3],"Urine + ",df['coef'].values[4],"Eye + ",\
-    df['coef'].values[5],"Monofilament + ",df['coef'].values[6],"Diet + ",df['coef'].values[7],"Physical Activity + ",df['coef'].values[8],"Education + ",df['coef'].values[10],"Comorbidity + ",df['coef'].values[11],"Health System + ",df['coef'].values[12],"Socioeconomic")
+    formula = "**Y-Glycaemia** = **" + str(df['coef'].values[0]) + "**Blood Pressure "
+    explanation = "-For every change in **Blood Pressure**, Glycaemia changes by **" + str(df['coef'].values[0]) + "** units"
+    if (df['coef'].values[1]<0):
+        formula += "**" + str(df['coef'].values[1]) + "**Lipids "
+    else:
+        formula += "+ **" + str(df['coef'].values[1]) + "**Lipids "
+    explanation += "<br/>-For every change in **Lipids**, Glycaemia changes by **" + str(df['coef'].values[1]) + "** units"
+    
+    if (df['coef'].values[2]<0):
+        formula +=  "**" + str(df['coef'].values[2]) + "**BMI "
+    else:
+        formula += "+ **" + str(df['coef'].values[2]) + "**BMI "       
+    explanation += "<br/>-For every change in **BMI**, Glycaemia changes by **" + str(df['coef'].values[2]) + "** units"
+    
+    if (df['coef'].values[3]<0):
+        formula +=  "**" + str(df['coef'].values[3]) + "**Urine "
+    else:
+        formula += "+ **" + str(df['coef'].values[3]) + "**Urine "
+    explanation += "<br/>-For every change in **Urine**, Glycaemia changes by **" + str(df['coef'].values[3]) + "** units"    
+    
+    if (df['coef'].values[4]<0):
+        formula +=  "**" + str(df['coef'].values[4]) + "**Eye "
+    else:
+        formula += "+ **" + str(df['coef'].values[4]) + "**Eye "    
+    explanation += "<br/>-For every change in **Eye**, Glycaemia changes by **" + str(df['coef'].values[4]) + "** units"
+    
+    if (df['coef'].values[5]<0):
+        formula +=  "**" + str(df['coef'].values[5]) + "**Monofilament "
+    else:
+        formula += "+ **" + str(df['coef'].values[5]) + "**Monofilament "
+    explanation += "<br/>-For every change in **Monofilament**, Glycaemia changes by **" + str(df['coef'].values[5]) + "** units"    
+    
+    if (df['coef'].values[6]<0):
+        formula +=  "**" + str(df['coef'].values[6]) + "**Diet "
+    else:
+        formula += "+ **" + str(df['coef'].values[6]) + "**Diet "
+    explanation += "<br/>-For every change in **Diet**, Glycaemia changes by **" + str(df['coef'].values[6]) + "** units" 
+    
+    if (df['coef'].values[7]<0):
+        formula +=  "**" + str(df['coef'].values[7]) + "**Physical Activity "
+    else:
+        formula += "+ **" + str(df['coef'].values[7]) + "**Physical Activity "
+    explanation += "<br/>-For every change in **Physical Activity**, Glycaemia changes by **" + str(df['coef'].values[7]) + "** units" 
+    
+    if (df['coef'].values[8]<0):
+        formula +=  "**" + str(df['coef'].values[8]) + "**Education "
+    else:
+        formula += "+ **" + str(df['coef'].values[8]) + "**Education "
+    explanation += "<br/>-For every change in **Education**, Glycaemia changes by **" + str(df['coef'].values[8]) + "** units"
+    
+    if (df['coef'].values[9]<0):
+        formula +=  "**" + str(df['coef'].values[9]) + "**Comorbidity "
+    else:
+        formula += "+ **" + str(df['coef'].values[9]) + "**Comorbidity "
+    explanation += "<br/>-For every change in **Comorbidity**, Glycaemia changes by **" + str(df['coef'].values[9]) + "** units"
+    
+    if (df['coef'].values[10]<0):
+        formula +=  "**" + str(df['coef'].values[10]) + "**Health System "
+    else:
+        formula += "+ **" + str(df['coef'].values[10]) + "**Health System "
+    explanation += "<br/>-For every change in **Health System**, Glycaemia changes by **" + str(df['coef'].values[10]) + "** units"
+    
+    if (df['coef'].values[11]<0):
+        formula +=  "**" + str(df['coef'].values[11]) + "**Socioeconomic "
+    else:
+        formula += "+ **" + str(df['coef'].values[11]) + "**Socioeconomic "
+    explanation += "<br/>-For every change in **Socioeconomic**, Glycaemia changes by **" + str(df['coef'].values[11]) + "** units"
+    
+    st.markdown(formula,unsafe_allow_html=True)
+    st.markdown(explanation,unsafe_allow_html=True)
+    #st.write("Y-Glycaemia = ",df['coef'].values[0],"Blood Pressure + ",df['coef'].values[1],"Lipids + ",df['coef'].values[2],"BMI + ",df['coef'].values[3],"Urine + ",df['coef'].values[4],"Eye + ",\
+    #df['coef'].values[5],"Monofilament + ",df['coef'].values[6],"Diet + ",df['coef'].values[7],"Physical Activity + ",df['coef'].values[8],"Education + ",df['coef'].values[10],"Comorbidity + ",df['coef'].values[11],"Health System + ",df['coef'].values[12],"Socioeconomic")
     
     
