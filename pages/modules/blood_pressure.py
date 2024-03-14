@@ -142,7 +142,7 @@ def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_da
     if value > 0:
         get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute)
     if not compute:    
-        set_data_capture_form(conn,patient_id,st,widgets,components)
+        set_data_capture_form(conn,patient_id,st,widgets,components,age)
   
 def readings_on_table_display(readings,st,date_range):
     if len(readings)<1:
@@ -230,7 +230,7 @@ def save_to_db(conn,patient_id,reading_date,dbp,sbp,mean_abp,scale,score,descrip
             ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components):   
+def set_data_capture_form(conn,patient_id,st,widgets,components,age):   
     ##modal widgets##
     modal = widgets.create_modal_widget("Capture blood pressure reading","blood_pressure",50,600)
     open_modal = st.button("Capture blood pressure reading","blood_pressure")
