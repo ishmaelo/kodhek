@@ -250,7 +250,7 @@ def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
             ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components):   
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
     ##modal widgets##
     modal = widgets.create_modal_widget("Health System Scoring","health_system",50,600)
     open_modal = st.button("Health System Scoring","health_system")
