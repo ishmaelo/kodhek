@@ -27,7 +27,7 @@ import pages.modules.socioeconomic as socioeconomic
 
 conn = utility.get_database_connection() #database connection
 utility.set_title(st) #Title of the page
-
+age = patient[2]
 
 ### display patient medical readings ###
 def display_patient(patient):
@@ -37,33 +37,33 @@ def display_patient(patient):
     
     with st.expander("**Capture readings**"):
         
-        blood_sugar.set_data_capture_form(conn,patient_id,st,widgets,components)
+        blood_sugar.set_data_capture_form(conn,patient_id,st,widgets,components,age)
     
-        hba1c.set_data_capture_form(conn,patient_id,st,widgets,components)
+        hba1c.set_data_capture_form(conn,patient_id,st,widgets,components,age)
    
-        blood_pressure.set_data_capture_form(conn,patient_id,st,widgets,components)
+        blood_pressure.set_data_capture_form(conn,patient_id,st,widgets,components,age)
   
-        lipid.set_data_capture_form(conn,patient_id,st,widgets,components)
+        lipid.set_data_capture_form(conn,patient_id,st,widgets,components,age)
    
-        bmi.set_data_capture_form(conn,patient_id,st,widgets,components)
+        bmi.set_data_capture_form(conn,patient_id,st,widgets,components,age)
    
-        urine.set_data_capture_form(conn,patient_id,st,widgets,components)    
+        urine.set_data_capture_form(conn,patient_id,st,widgets,components,age)    
   
-        eye.set_data_capture_form(conn,patient_id,st,widgets,components)    
+        eye.set_data_capture_form(conn,patient_id,st,widgets,components,age)    
     
-        monofilament.set_data_capture_form(conn,patient_id,st,widgets,components)
+        monofilament.set_data_capture_form(conn,patient_id,st,widgets,components,age)
   
-        diet.set_data_capture_form(conn,patient_id,st,widgets,components)    
+        diet.set_data_capture_form(conn,patient_id,st,widgets,components,age)    
  
-        physical_activity.set_data_capture_form(conn,patient_id,st,widgets,components)    
+        physical_activity.set_data_capture_form(conn,patient_id,st,widgets,components,age)    
    
-        education.set_data_capture_form(conn,patient_id,st,widgets,components)
+        education.set_data_capture_form(conn,patient_id,st,widgets,components,age)
 
-        comorbidity.set_data_capture_form(conn,patient_id,st,widgets,components)
+        comorbidity.set_data_capture_form(conn,patient_id,st,widgets,components,age)
    
-        health_system.set_data_capture_form(conn,patient_id,st,widgets,components)
+        health_system.set_data_capture_form(conn,patient_id,st,widgets,components,age)
  
-        socioeconomic.set_data_capture_form(conn,patient_id,st,widgets,components)
+        socioeconomic.set_data_capture_form(conn,patient_id,st,widgets,components,age)
     
     col1, col2, col3, col4 = st.columns([1,1,1,1])
     col1.markdown("<br/>",unsafe_allow_html=True)
