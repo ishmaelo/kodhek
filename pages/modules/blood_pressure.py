@@ -248,6 +248,7 @@ def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):
             reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="bp-date")
             systolic = st.number_input("Systolic in mm Hg",key="bp-systolic")
             diastolic = st.number_input("Diastolic in mm Hg",key="bp-diastolic")
+            st.write('Age:',age)
             if st.button('Submit reading',key="bp-submit"):
                 if (systolic >= 100 and systolic <= 129) or (diastolic >= 60 and diastolic < 84):
                     result = 'Normal'
