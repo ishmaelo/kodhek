@@ -32,7 +32,7 @@ utility.set_title(st) #Title of the page
 ### display patient medical readings ###
 def display_patient(patient):
     utility.patient_header_info(patient,st) #header information having patient name, gender, date of birth, etc
-    age = patient[2]
+    age = utility.get_age(patient[2])
     
     
     with st.expander("**Capture readings**"):
