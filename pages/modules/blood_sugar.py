@@ -241,7 +241,7 @@ def save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bg
             ''')
     conn.commit()    
 
-def set_data_capture_form(conn,patient_id,st,widgets,components):   
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
     ##modal widgets##
     modal = widgets.create_modal_widget("Capture blood sugar reading","blood_sugar",50,600)
     open_modal = st.button("Capture blood sugar reading","blood_sugar")
