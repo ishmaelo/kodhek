@@ -1,8 +1,9 @@
- 
+import pandas as pd 
+from datetime import datetime
 
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute):
     if not compute:
-        st.markdown("""---""")
+        #st.markdown("""---""")
         st.subheader("1. Blood Glucose")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     if not compute:
@@ -13,8 +14,8 @@ def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_da
         if not compute:
             get_readings_for_tir(conn,patient_id,start_date,end_date,st, utility)
         get_readings_for_concordance(conn,patient_id,start_date,end_date,st,pd,utility,compute)    
-    if not compute:
-        set_data_capture_form(conn,patient_id,st,widgets,components)
+    #if not compute:
+        #set_data_capture_form(conn,patient_id,st,widgets,components)
     
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
@@ -231,101 +232,200 @@ def get_row_data(resultset):
        very_high.append(1)
     return dates,optimal,normal,elevated,high,very_high
 
-def save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time):
-    conn.execute(f'''
-            INSERT INTO bgm (
-            patient_id, reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time
-            ) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{reading_category}','{measurement_type}','{bgm_reading}','{scale}','{score}','{description}','{reading_time}')
-            ''')
+def save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time,data_id):
+ 
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE bgm set reading_date = ?, reading_category=?, measurement_type=?, bgm_reading=?, scale=?, score=?, description=?, reading_time=? where id = ?"""
+        data = (str(reading_date),str(reading_category),str(measurement_type),str(bgm_reading),str(scale),str(score),str(description),str(reading_time),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO bgm (
+                patient_id, reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{reading_category}','{measurement_type}','{bgm_reading}','{scale}','{score}','{description}','{reading_time}')
+                ''')
     conn.commit()    
-
-def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture blood sugar reading","blood_sugar",50,600)
-    open_modal = st.button("Capture blood sugar reading","blood_sugar")
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM bgm where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
     
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
-       
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD")
-            reading_time = st.time_input("Reading time",value=None)
-            option = st.selectbox(
-               "What is the time option for this reading?",
-               ("Random", "Before breakfast", "2 hours after breakfast", "Before lunch", "2 hours after lunch", "Before supper", "2 hours after supper", "Midnight"),
-               index=None,
-               placeholder="Select reading time",
-            )
-            mmol = st.number_input("BGM reading (in mmol/lit):")
-            if st.button('Submit reading'):
-                if option=='Random':
-                    if mmol >= 3.9 and mmol <= 5.5:
-                        result = 'Optimal'
-                        mpc = 1
-                        score = 5
-                        st.success(result)
-                    if mmol >= 5.6 and mmol <= 7.9:
-                        result = 'Normal'
-                        mpc = 2
-                        score = 4
-                        st.info(result)
-                    if mmol >= 8 and mmol <= 9:
-                        result = 'Elevated'
-                        mpc = 3
-                        score = 3
-                        st.warning(result)        
-                    if ((mmol >= 9.1 and mmol <= 10.4) or (mmol >= 3 and mmol <= 3.8)):
-                        result = 'High/grade 1 hypo'
-                        mpc = 4
-                        score = 2
-                        st.error(result)
-                    if mmol > 10 and mmol < 3:
-                        result = 'Very high/grade 2 hypo'
-                        mpc = 5
-                        score = 1
-                        st.error(result)
-                else:
-                    if mmol >= 3.9 and mmol <= 6:
-                        result = 'Optimal'
-                        mpc = 1
-                        score = 5
-                        st.success(result)
-                    if mmol >= 6.1 and mmol <= 6.9:
-                        result = 'Normal'
-                        mpc = 2
-                        score = 4
-                        st.info(result)
-                    if mmol >= 7 and mmol <= 10:
-                        result = 'Elevated'
-                        mpc = 3
-                        score = 3 
-                        st.warning(result)
-                    if mmol >= 10.1 and mmol <= 13.9:
-                        result = 'High/grade 1 hypo'
-                        mpc = 4
-                        score = 2
-                        st.error(result)
-                    if mmol > 13.9:
-                        result = 'Very high/grade 2 hypo'
-                        mpc = 5
-                        score = 1
-                        st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    reading_category = measurement_type = option
-                    bgm_reading = mmol
-                    description = result
-                    scale = mpc
-                    save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time)
-                    st.success("Reading saved")
-          
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+    return       
            
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date,reading_time,reading_category, bgm_reading, score, scale, description,id FROM bgm WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Reading Time','Reading Category','BGM Reading','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    df['Reading Time'] = df['Reading Time'].apply(pd.Timestamp)
+    edited_df = st.data_editor(
+    df,
+    key="blood_sugar_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Scale","Description"],
+    column_config={
+        "Reading Category": st.column_config.SelectboxColumn(
+            options=["Random", "Before breakfast", "2 hours after breakfast", "Before lunch", "2 hours after lunch", "Before supper", "2 hours after supper", "Midnight"],
+            required=True,
+        ),
+        "Reading Time": st.column_config.TimeColumn(
+            format="h:mm a",
+            step=60,
+            required=True,
+        ),
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "BGM Reading": st.column_config.NumberColumn(
+            required=True,
+        ),
+       
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    
+    st.write('In order to add or update a blood sugar record, enter/alter Reading Date, Reading Time, Reading Category and BGM Reading only. The system will automatically fill in the values for the other columns.')
+    if st.button('Save Changes',key="blood_sugar_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["blood_sugar_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            option = df.loc[index, 'Reading Category']
+            reading_date = df.loc[index, 'Reading Date']
+            reading_time = df.loc[index, 'Reading Time']
+            mmol = df.loc[index, 'BGM Reading']
+            #check what has changed
+            if 'Reading Category' in item:
+                if option != item['Reading Category']:
+                    option = item['Reading Category']
+                    
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            
+            if 'Reading Time' in item:
+                if reading_time != item['Reading Time']:
+                    reading_time = item['Reading Time']
+
+            if  'BGM Reading' in item:
+                if mmol != item['BGM Reading']:
+                    mmol = item['BGM Reading']
+            save_readings(conn,st,0,option,mmol,reading_date,reading_time,index+1,data_id)
+        ##New Records
+        added_rows = st.session_state["blood_sugar_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            option = reading_date = reading_time = mmol = ''
+            #check what has been added
+            if 'Reading Category' in item:
+                option = item['Reading Category']
+                    
+            if 'Reading Date' in item:
+                reading_date = item['Reading Date']
+            
+            if 'Reading Time' in item:
+                reading_time = item['Reading Time']
+
+            if  'BGM Reading' in item:
+                mmol = item['BGM Reading']
+            if option and reading_date and reading_time and mmol:
+                save_readings(conn,st,patient_id,option,mmol,reading_date,reading_time,index)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["blood_sugar_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,option,mmol,reading_date,reading_time,record,data_id=''):
+    result = ''
+    if option=='Random':
+        if mmol >= 3.9 and mmol <= 5.5:
+            result = 'Optimal'
+            mpc = 1
+            score = 5
+            #st.success(result)
+        if mmol >= 5.6 and mmol <= 7.9:
+            result = 'Normal'
+            mpc = 2
+            score = 4
+            #st.info(result)
+        if mmol >= 8 and mmol <= 9:
+            result = 'Elevated'
+            mpc = 3
+            score = 3
+            #st.warning(result)        
+        if ((mmol >= 9.1 and mmol <= 10.4) or (mmol >= 3 and mmol <= 3.8)):
+            result = 'High/grade 1 hypo'
+            mpc = 4
+            score = 2
+           # st.error(result)
+        if mmol > 10 and mmol < 3:
+            result = 'Very high/grade 2 hypo'
+            mpc = 5
+            score = 1
+            #st.error(result)
+    else:
+        if mmol >= 3.9 and mmol <= 6:
+            result = 'Optimal'
+            mpc = 1
+            score = 5
+            #st.success(result)
+        if mmol >= 6.1 and mmol <= 6.9:
+            result = 'Normal'
+            mpc = 2
+            score = 4
+            #st.info(result)
+        if mmol >= 7 and mmol <= 10:
+            result = 'Elevated'
+            mpc = 3
+            score = 3 
+            #st.warning(result)
+        if mmol >= 10.1 and mmol <= 13.9:
+            result = 'High/grade 1 hypo'
+            mpc = 4
+            score = 2
+            #st.error(result)
+        if mmol > 13.9:
+            result = 'Very high/grade 2 hypo'
+            mpc = 5
+            score = 1
+            #st.error(result)
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        reading_category = measurement_type = option
+        bgm_reading = mmol
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+            reading_time = datetime.strptime(str(reading_time), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+            reading_time = datetime.strptime(str(reading_time), '%H:%M:%S.%f')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        
+        reading_time = reading_time.strftime('%H:%M:%S')
+        save_to_db(conn,patient_id,reading_date,reading_category,measurement_type,bgm_reading,scale,score,description,reading_time,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

@@ -1,3 +1,6 @@
+import pandas as pd 
+from datetime import datetime
+
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date, reading, description FROM monofilament WHERE patient_id = " + str(patient_id) + ""
@@ -240,65 +243,141 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
     return reading_scores, reading
     
-def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
-    conn.execute(f'''
-            INSERT INTO monofilament (
-            patient_id, reading_date,bgm_reading,scale,score,description
-            ) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{bgm_reading}','{scale}','{score}','{description}')
-            ''')
+def save_to_db(conn,patient_id,reading_date,reading,scale,score,description,data_id):
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE monofilament set reading_date = ?,reading=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(reading),str(scale),str(score),str(description),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO monofilament (
+                patient_id, reading_date, reading, scale, score, description
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{reading}','{scale}','{score}','{description}')
+                ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture Monofilament Test reading","monofilament",50,600)
-    open_modal = st.button("Capture Monofilament Test reading","monofilament")
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM monofilament where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
     
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+   return
+   
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date,reading, score, scale, description,id FROM monofilament WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Monofilament Test Results','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    edited_df = st.data_editor(
+    df,
+    key="monofilament_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Description"],
+    column_config={
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "Monofilament Test Results": st.column_config.SelectboxColumn(
+            options=["5 sensations felt out of 5", "4 sensations felt out of 5", "3 sensations felt out of 5", "2 sensations felt out of 5", "1 sensations felt out of 5"],
+            required=True,
+        ),
        
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="monofilament-date")
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a Monofilament Test record, enter/alter Reading Date, and the Monofilament Test Results. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="bp_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["monofilament_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            reading_date = df.loc[index, 'Reading Date']
+            test = df.loc[index, 'Monofilament Test Results']
+                    
+            #check what has changed
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Monofilament Test Results' in item:
+                if test != item['Monofilament Test Results']:
+                    test = item['Monofilament Test Results']
+            save_readings(conn,st,0,test,reading_date,index+1,data_id)
+        ##New Records
+        added_rows = st.session_state["monofilament_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            reading_date = test = ''
+            #check what has been added
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Monofilament Test Results' in item:
+                if test != item['Monofilament Test Results']:
+                    test = item['Monofilament Test Results']
+            if test:
+                save_readings(conn,st,patient_id,test,reading_date,index)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["monofilament_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
+    result = ''
+    if test == '5 sensations felt out of 5':
+        result = 'Normal'
+        mpc = 1
+        score = 5
+        
+    if test == '4 sensations felt out of 5':
+        result = 'Mild'
+        mpc = 2
+        score = 4
+       
+    if test == '3 sensations felt out of 5':
+        result = 'Moderate'
+        mpc = 3
+        score = 3
             
-            mmol = st.number_input("HBA1C %:",key="monofilament-reading")
-            if st.button('Submit reading',key="monofilament-submit"):
-                if mmol >= 6 and mmol <= 7:
-                    result = 'Optimal'
-                    mpc = 1
-                    score = 5
-                    st.success(result)
-                if mmol >= 7.1 and mmol <= 7.6:
-                    result = 'Normal'
-                    mpc = 2
-                    score = 4
-                    st.info(result)
-                if mmol >= 7.7 and mmol <= 8.2:
-                    result = 'Elevated'
-                    mpc = 3
-                    score = 3
-                    st.warning(result)        
-                if mmol >= 8.3 and mmol <= 8.8:
-                    result = 'High'
-                    mpc = 4
-                    score = 2
-                    st.error(result)
-                if mmol > 8.8:
-                    result = 'Very high'
-                    mpc = 5
-                    score = 1
-                    st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    bgm_reading = mmol
-                    description = result
-                    scale = mpc
-                    save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
-                    st.success("Reading saved")
+    if test == '2 sensations felt out of 5':
+        result = 'Severe'
+        mpc = 4
+        score = 2
+       
+    if test == '1 sensations felt out of 5':
+        result = 'Very severe'
+        mpc = 5
+        score = 1
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,test,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

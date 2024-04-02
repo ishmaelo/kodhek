@@ -1,6 +1,9 @@
+import pandas as pd 
+from datetime import datetime
+
 def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_date,end_date,date_range,widgets,components,compute):
     if not compute:
-        st.markdown("""---""")
+        #st.markdown("""---""")
         st.subheader("2. HBA1C")
     readings = get_readings_for_display(conn,patient_id,start_date,end_date)
     if not compute:
@@ -13,7 +16,7 @@ def load_readings_with_chart(patient_id,st,conn,utility,pd,alt,datetime,start_da
         check_next_appointment(st,conn,patient_id,widgets,components,utility)
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading_category, bgm_reading, description FROM hba1c WHERE patient_id = " + str(patient_id) + ""
+    sql = "SELECT reading_date,bgm_reading, description FROM hba1c WHERE patient_id = " + str(patient_id) + ""
     if start_date:
         sql += " AND reading_date BETWEEN DATE('" + str(start_date) + "') AND DATE('" + str(end_date) + "') ORDER BY reading_date ASC";
     else:
@@ -176,9 +179,9 @@ def readings_on_table_display(readings,st,date_range):
         with date:
             st.write(row[0])
         with bgm:
-           st.write(str(row[2]))
+           st.write(str(row[1]))
         with description:
-           st.write(row[3])
+           st.write(row[2])
         i += 1
        
 def get_row_data(resultset):
@@ -236,65 +239,165 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
     return reading_scores, reading
     
-def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
-    conn.execute(f'''
-            INSERT INTO hba1c (
-            patient_id, reading_date,bgm_reading,scale,score,description
-            ) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{bgm_reading}','{scale}','{score}','{description}')
-            ''')
+def save_to_db(conn,patient_id,reading_date,hba1c,special,scale,score,description,data_id):
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE hba1c set reading_date = ?, bgm_reading=?, special_case=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(hba1c),str(special),str(scale),str(score),str(description),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO hba1c (
+                patient_id, reading_date, bgm_reading, special_case, scale, score, description
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{hba1c}','{special}','{scale}','{score}','{description}')
+                ''')
     conn.commit()    
     
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM hba1c where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
 def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture HBA1C reading","hba1c",50,600)
-    open_modal = st.button("Capture HBA1C reading","hba1c")
-    
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
+    return
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date, bgm_reading, special_case, score, scale, description,id FROM hba1c WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','HBA1C Reading','Is Special Case?','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    edited_df = st.data_editor(
+    df,
+    key="hba1c_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Description"],
+    column_config={
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "HBA1C Reading": st.column_config.NumberColumn(
+            required=True,
+        ),
+        "Is Special Case?": st.column_config.CheckboxColumn(
+            required=True,
+        ),
        
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="hba1c-date")
-            
-            mmol = st.number_input("HBA1C %:",key="hba1c-reading")
-            if st.button('Submit reading',key="hba1c-submit"):
-                if mmol >= 6 and mmol <= 7:
-                    result = 'Optimal'
-                    mpc = 1
-                    score = 5
-                    st.success(result)
-                if mmol >= 7.1 and mmol <= 7.6:
-                    result = 'Normal'
-                    mpc = 2
-                    score = 4
-                    st.info(result)
-                if mmol >= 7.7 and mmol <= 8.2:
-                    result = 'Elevated'
-                    mpc = 3
-                    score = 3
-                    st.warning(result)        
-                if mmol >= 8.3 and mmol <= 8.8:
-                    result = 'High'
-                    mpc = 4
-                    score = 2
-                    st.error(result)
-                if mmol > 8.8:
-                    result = 'Very high'
-                    mpc = 5
-                    score = 1
-                    st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    bgm_reading = mmol
-                    description = result
-                    scale = mpc
-                    save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
-                    st.success("Reading saved")
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a HBA1C record, enter/alter Reading Date, HBA1C Reading, and specify whether it is a Special Case or not. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="hba1c_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["hba1c_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            reading_date = df.loc[index, 'Reading Date']
+            hba1c = df.loc[index, 'HBA1C Reading']
+            special = df.loc[index, 'Is Special Case?'] 
+            #check what has changed
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'HBA1C Reading' in item:
+                if hba1c != item['HBA1C Reading']:
+                    hba1c = item['HBA1C Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            save_readings(conn,st,0,hba1c,reading_date,special,index+1,data_id)
+        ##New Records
+        added_rows = st.session_state["hba1c_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            reading_date = hba1c = special = ''
+            #check what has been added
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'HBA1C Reading' in item:
+                if hba1c != item['HBA1C Reading']:
+                    hba1c = item['HBA1C Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            if reading_date and hba1c:
+                save_readings(conn,st,patient_id,hba1c,reading_date,special,index)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["hba1c_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,hba1c,reading_date,special,record,data_id=''):
+    result = ''
+    if special:
+        if hba1c <=8.0:
+            result = 'Optimal'
+            mpc = 1
+            score = 5
+        if hba1c >= 8.1 and hba1c <= 8.5:
+            result = 'Normal'
+            mpc = 2
+            score = 4
+        if hba1c >= 8.6 and hba1c <= 9.1:
+            result = 'Elevated'
+            mpc = 3
+            score = 3       
+        if hba1c >= 9.2 and hba1c <= 9.7:
+            result = 'High'
+            mpc = 4
+            score = 2
+        if hba1c >= 9.8:
+            result = 'Very high'
+            mpc = 5
+            score = 1
+    else:
+        if hba1c >= 6 and hba1c <= 7:
+            result = 'Optimal'
+            mpc = 1
+            score = 5
+        if hba1c >= 7.1 and hba1c <= 7.6:
+            result = 'Normal'
+            mpc = 2
+            score = 4
+        if hba1c >= 7.7 and hba1c <= 8.2:
+            result = 'Elevated'
+            mpc = 3
+            score = 3       
+        if hba1c >= 8.3 and hba1c <= 8.8:
+            result = 'High'
+            mpc = 4
+            score = 2
+        if hba1c > 8.8:
+            result = 'Very high'
+            mpc = 5
+            score = 1
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,hba1c,special,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

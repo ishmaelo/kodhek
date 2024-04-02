@@ -1,3 +1,6 @@
+import pandas as pd 
+from datetime import datetime
+
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date, reading, acr, dialysis, description FROM urine WHERE patient_id = " + str(patient_id) + ""
@@ -249,66 +252,141 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
     return reading_scores, reading
 
-
-def save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description):
-    conn.execute(f'''
-            INSERT INTO urine (
-            patient_id, reading_date,bgm_reading,scale,score,description
-            ) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{bgm_reading}','{scale}','{score}','{description}')
-            ''')
+def save_to_db(conn,patient_id,reading_date,uma,scale,score,description,data_id):
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE urine set reading_date = ?,reading=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(uma),str(scale),str(score),str(description),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO urine (
+                patient_id, reading_date, reading, scale, score, description
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{uma}','{scale}','{score}','{description}')
+                ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture Urine Dipstick Test reading","urine",50,600)
-    open_modal = st.button("Capture Urine Dipstick Test reading","urine")
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM urine where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
     
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+   return
+   
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date,reading, score, scale, description,id FROM urine WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Urine Microalbumin','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    edited_df = st.data_editor(
+    df,
+    key="urine_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Description"],
+    column_config={
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "Urine Microalbumin": st.column_config.SelectboxColumn(
+            options=["<30mg/dl or >once/regular dialysis", "<30mg/dl [ACR 11-20mg/dl]", "30-300mg/dl [ACR 21-29mg/dl]", ">300mg/dl [ACR>=30mg/dl]", "Nil or poor dialysis [ACR>=100mg/dl]"],
+            required=True,
+        ),
        
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="urine-date")
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a Urine Dipstick record, enter/alter Reading Date, and Urine Microalbumin. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="bp_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["urine_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            reading_date = df.loc[index, 'Reading Date']
+            uma = df.loc[index, 'Urine Microalbumin']
+                    
+            #check what has changed
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Urine Microalbumin' in item:
+                if uma != item['Urine Microalbumin']:
+                    uma = item['Urine Microalbumin']
+            save_readings(conn,st,0,uma,reading_date,index+1,data_id)
+        ##New Records
+        added_rows = st.session_state["urine_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            reading_date = uma = ''
+            #check what has been added
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Urine Microalbumin' in item:
+                if uma != item['Urine Microalbumin']:
+                    uma = item['Urine Microalbumin']
+            if uma:
+                save_readings(conn,st,patient_id,uma,reading_date,index)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["urine_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,uma,reading_date,record,data_id=''):
+    result = ''
+    if uma == '<30mg/dl or >once/regular dialysis':
+        result = 'Optimal'
+        mpc = 1
+        score = 5
+        
+    if uma == '<30mg/dl [ACR 11-20mg/dl]':
+        result = 'Good'
+        mpc = 2
+        score = 4
+       
+    if uma == '30-300mg/dl [ACR 21-29mg/dl]':
+        result = 'Fair'
+        mpc = 3
+        score = 3
             
-            mmol = st.number_input("HBA1C %:",key="urine-reading")
-            if st.button('Submit reading',key="urine-submit"):
-                if mmol >= 6 and mmol <= 7:
-                    result = 'Optimal'
-                    mpc = 1
-                    score = 5
-                    st.success(result)
-                if mmol >= 7.1 and mmol <= 7.6:
-                    result = 'Normal'
-                    mpc = 2
-                    score = 4
-                    st.info(result)
-                if mmol >= 7.7 and mmol <= 8.2:
-                    result = 'Elevated'
-                    mpc = 3
-                    score = 3
-                    st.warning(result)        
-                if mmol >= 8.3 and mmol <= 8.8:
-                    result = 'High'
-                    mpc = 4
-                    score = 2
-                    st.error(result)
-                if mmol > 8.8:
-                    result = 'Very high'
-                    mpc = 5
-                    score = 1
-                    st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    bgm_reading = mmol
-                    description = result
-                    scale = mpc
-                    save_to_db(conn,patient_id,reading_date,bgm_reading,scale,score,description)
-                    st.success("Reading saved")
+    if uma == '>300mg/dl [ACR>=30mg/dl]':
+        result = 'Poor'
+        mpc = 4
+        score = 2
+       
+    if uma == 'Nil or poor dialysis [ACR>=100mg/dl]':
+        result = 'Very poor'
+        mpc = 5
+        score = 1
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,uma,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

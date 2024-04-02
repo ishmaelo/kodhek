@@ -19,9 +19,12 @@ from datetime import date
 from datetime import datetime
 from dateutil import relativedelta
 
-def set_title(st):
+import pandas as pd 
+
+
+#def set_title(st):
     #st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care', layout = 'wide', initial_sidebar_state = 'auto')
-    st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care',layout = 'wide',initial_sidebar_state = 'collapsed')
+    #st.set_page_config(page_title='Dr. Kodhek - T2DM Optimal care',layout = 'wide',initial_sidebar_state = 'collapsed')
     
 def get_database_connection():
     import sqlite3
@@ -34,6 +37,15 @@ def get_patient(conn,patient_id):
     cursor.execute(sql,patient_id)
     result, = cursor.fetchall()
     return result
+
+def get_patient_by_name(conn,patient_name):
+    sql = "SELECT id FROM biodata WHERE patient_name = ?"
+    patient_name = (patient_name,)
+    cursor=conn.cursor()
+    cursor.execute(sql,patient_name)
+    result, = cursor.fetchall()
+    return result
+    
 def get_patient_id_via_url(st):
     patient_id = ''
     target = ''
@@ -80,7 +92,6 @@ def add_date(the_date,years,months):
     return new_date.strftime('%Y-%m-%d')
    
 def patient_header_info(patient,st):    
-    st.link_button("Back to list of patients", "Patients")
     patient_id = patient[0]
     st.title(patient[1])
     age = " {} {} ".format(get_age(patient[2]), ' years')
@@ -96,7 +107,7 @@ def patient_header_info(patient,st):
     if (months>1):
         mnths = str(months) + " months"
     st.write("Diabetic for the last ", yrs, mnths)
-    st.markdown("""---""")
+    #st.markdown("""---""")
     
 def get_score_description(index):
     scores = ["Undefined","Poor Care","Fair Care","Average Care","Good Care","Optimal Care"]
@@ -1156,7 +1167,221 @@ def logistic_regression(df_scores, st, pd):
     
     st.markdown(formula,unsafe_allow_html=True)
     st.markdown(explanation,unsafe_allow_html=True)
-    #st.write("Y-Glycaemia = ",df['coef'].values[0],"Blood Pressure + ",df['coef'].values[1],"Lipids + ",df['coef'].values[2],"BMI + ",df['coef'].values[3],"Urine + ",df['coef'].values[4],"Eye + ",\
-    #df['coef'].values[5],"Monofilament + ",df['coef'].values[6],"Diet + ",df['coef'].values[7],"Physical Activity + ",df['coef'].values[8],"Education + ",df['coef'].values[10],"Comorbidity + ",df['coef'].values[11],"Health System + ",df['coef'].values[12],"Socioeconomic")
     
+def load_data(st,conn,patient_id,reading_option):
+    if reading_option == 'Blood Sugar':
+        return blood_sugar.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'HBA1C':
+        hba1c.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Blood Pressure':
+        blood_pressure.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Lipid':
+        lipid.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'BMI':
+        bmi.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Urine':
+        urine.get_readings_for_edit(st,conn,patient_id) 
+    if reading_option == 'Eye':
+        eye.get_readings_for_edit(st,conn,patient_id)    
+    if reading_option == 'Monofilament':
+        monofilament.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Diet':
+        diet.get_readings_for_edit(st,conn,patient_id)   
+    if reading_option == 'Physical Activity':
+        physical_activity.get_readings_for_edit(st,conn,patient_id)    
+    if reading_option == 'Education':
+        education.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Comorbidity':
+        comorbidity.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Health System':
+        health_system.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Socioeconomic':
+        socioeconomic.get_readings_for_edit(st,conn,patient_id)
+    if reading_option == 'Patients':
+        get_patient_readings_for_edit(st,conn,patient_id)
+        
+        
+def save_patient_data(st,conn,patient_id,patient_name, date_of_birth, sex,diagnosis_date,residence, profession,data_id=''):
+        
+    if data_id:
+        date_of_birth = datetime.strptime(str(date_of_birth), '%Y-%m-%d %H:%M:%S')
+        diagnosis_date = datetime.strptime(str(diagnosis_date), '%Y-%m-%d')
+    else:
+        date_of_birth = datetime.strptime(str(date_of_birth), '%Y-%m-%d')
+        diagnosis_date = datetime.strptime(str(diagnosis_date), '%Y-%m-%d')
+    date_of_birth = date_of_birth.strftime('%d/%m/%Y')
+    diagnosis_date = diagnosis_date.strftime('%Y-%m-%d')
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE biodata set patient_name = ?,date_of_birth=?, sex=?, diagnosis_date=?, residence=?, profession=? where id = ?"""
+        data = (str(patient_name),str(date_of_birth),str(sex),str(diagnosis_date),str(residence),str(profession),str(data_id))
+        cursor.execute(sql_update_query, data)
+        st.success("Updated information for patient record " + str(data_id) + " saved.")
+    else:
+        conn.execute(f'''
+                INSERT INTO biodata (
+                patient_name, date_of_birth, sex, diagnosis_date, residence, profession
+                ) 
+                VALUES 
+                ('{patient_name}','{date_of_birth}','{sex}','{diagnosis_date}','{residence}','{profession}')
+                ''')
+        st.success("New patient record saved.")
+    conn.commit()    
     
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM biodata where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Patient details with record ID ' + str(data_id) + ' deleted.')
+    
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+   return
+   
+def get_patient_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT patient_name,date_of_birth,sex,diagnosis_date,residence,profession,id FROM biodata ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Patient Name','Date of Birth','Gender','Date of T2DM Diagnosis','Residence','Profession','ID'])
+    df['Date of Birth'] = pd.to_datetime(df['Date of Birth'])
+    df['Date of T2DM Diagnosis'] = pd.to_datetime(df['Date of T2DM Diagnosis'])
+    edited_df = st.data_editor(
+    df,
+    key="biodata_df",
+    num_rows="dynamic",
+    disabled=["ID"],
+    column_config={
+        "Date of Birth": st.column_config.DateColumn(
+            format="DD/MM/YYYY",
+            step=1,
+            required=True,
+        ),
+         "Date of T2DM Diagnosis": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "Gender": st.column_config.SelectboxColumn(
+            options=["Male", "Female"],
+            required=True,
+        ),
+       
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a Patient record, enter/alter Patient Name,Date of Birth, Gender,Date of T2DM Diagnosis,Residence,and Profession. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="bp_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["biodata_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            patient_name = df.loc[index, 'Patient Name']
+            dob = df.loc[index, 'Date of Birth']
+            dx_date = df.loc[index, 'Date of T2DM Diagnosis']
+            sex = df.loc[index, 'Gender']
+            residence = df.loc[index, 'Residence']
+            profession = df.loc[index, 'Profession']
+                    
+            #check what has changed
+            if 'Patient Name' in item:
+                if patient_name != item['Patient Name']:
+                    patient_name = item['Patient Name']
+            if  'Date of Birth' in item:
+                if dob != item['Date of Birth']:
+                    dob = item['Date of Birth']
+            if  'Date of T2DM Diagnosis' in item:
+                if dx_date != item['Date of T2DM Diagnosis']:
+                    dx_date = item['Date of T2DM Diagnosis']
+            if  'Gender' in item:
+                if sex != item['Gender']:
+                    sex = item['Gender']
+            if  'Residence' in item:
+                if residence != item['Residence']:
+                    residence = item['Residence']
+            if  'Profession' in item:
+                if profession != item['Profession']:
+                    profession = item['Profession']
+            save_patient_data(st,conn,0,patient_name, dob, sex, dx_date, residence, profession,data_id)
+        ##New Records
+        added_rows = st.session_state["biodata_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            patient_name = dob = dx_date = sex = residence = profession = ''
+            #check what has been added
+            if 'Patient Name' in item:
+                if patient_name != item['Patient Name']:
+                    patient_name = item['Patient Name']
+            if  'Date of Birth' in item:
+                if dob != item['Date of Birth']:
+                    dob = item['Date of Birth']
+            if  'Date of T2DM Diagnosis' in item:
+                if dx_date != item['Date of T2DM Diagnosis']:
+                    dx_date = item['Date of T2DM Diagnosis']
+            if  'Gender' in item:
+                if sex != item['Gender']:
+                    sex = item['Gender']
+            if  'Residence' in item:
+                if residence != item['Residence']:
+                    residence = item['Residence']
+            if  'Profession' in item:
+                if profession != item['Profession']:
+                    profession = item['Profession']
+            if patient_name and dob and dx_date and sex and residence and profession:
+                save_patient_data(st,conn,patient_id,patient_name, dob, sex, dx_date, residence, profession)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["biodata_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
+    result = ''
+    test = int(test)
+    if test == 5:
+        result = 'Excellent/no distress'
+        mpc = 1
+        score = 5
+        
+    if  test == 4:
+        result = 'Good/mild distress'
+        mpc = 2
+        score = 4
+       
+    if  test == 3:
+        result = 'Average/moderate distress'
+        mpc = 3
+        score = 3
+            
+    if  test == 2:
+        result = 'Fair/high distress'
+        mpc = 4
+        score = 2
+       
+    if  test == 1:
+        result = 'Poor/very high distress'
+        mpc = 5
+        score = 1
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,test,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

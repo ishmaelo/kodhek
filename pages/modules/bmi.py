@@ -1,3 +1,7 @@
+import pandas as pd 
+from datetime import datetime
+import pages.modules.utilities as utility
+
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date, bmi_reading, description FROM bmi WHERE patient_id = " + str(patient_id) + ""
@@ -229,62 +233,206 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading = average_score/divider
         reading_scores = average_score_scores/divider
     return reading_scores, reading
-
-def save_to_db(conn,patient_id,reading_date,bmi,scale,score,description):
-    conn.execute(f'''
-            INSERT INTO bmi (patient_id,reading_date,bmi_reading,scale,score,description) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{bmi}','{scale}','{score}','{description}')
-            ''')
+   
+def save_to_db(conn,patient_id,reading_date,bmi,special,scale,score,description,data_id):
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE bmi set reading_date = ?, bmi_reading=?, special_case=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(bmi),str(special),str(scale),str(score),str(description),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO bmi (
+                patient_id, reading_date, bmi_reading, special_case, scale, score, description
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{bmi}','{special}','{scale}','{score}','{description}')
+                ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture BMI reading","bmi",50,600)
-    open_modal = st.button("Capture BMI reading","bmi")
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM bmi where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
     
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+   return
+   
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date, bmi_reading, special_case, score, scale, description,id FROM bmi WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','BMI Reading','Is Special Case?','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    edited_df = st.data_editor(
+    df,
+    key="bmi_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Description"],
+    column_config={
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "BMI Reading": st.column_config.NumberColumn(
+            required=True,
+        ),
+        "Is Special Case?": st.column_config.CheckboxColumn(
+            required=True,
+        ),
        
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="bp-date")
-            bmi = st.number_input("BMI",key="bmi-bmi")
-            if st.button('Submit reading',key="bmi-submit"):
-                if bmi >= 18.5 and bmi <= 24.9:
-                    result = 'Normal'
-                    mpc = 1
-                    score = 5
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a BMI record, enter/alter Reading Date, BMI Reading, and specify whether it is a Special Case or not. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="bmi_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["bmi_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            reading_date = df.loc[index, 'Reading Date']
+            bmi = df.loc[index, 'BMI Reading']
+            special = df.loc[index, 'Is Special Case?'] 
+            #check what has changed
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'BMI Reading' in item:
+                if bmi != item['BMI Reading']:
+                    bmi = item['BMI Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            save_readings(conn,st,0,bmi,reading_date,special,index+1,patient_id,data_id)
+        ##New Records
+        added_rows = st.session_state["bmi_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            reading_date = bmi = special = ''
+            #check what has been added
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'BMI Reading' in item:
+                if bmi != item['BMI Reading']:
+                    bmi = item['BMI Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            if reading_date and bmi:
+                save_readings(conn,st,patient_id,bmi,reading_date,special,index,patient_id)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["bmi_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,bmi,reading_date,special,record,real_patient_id,data_id=''):    
+    result = ''
+    if special:
+        patient = utility.get_patient(conn,str(real_patient_id))
+        gender = patient[3]
+        if gender == 'Male':
+            if bmi >= 25 and bmi <= 27:
+                result = 'Normal'
+                mpc = 1
+                score = 5
+
+            if bmi >= 27.1 and bmi <= 29.9:
+                result = 'Overweight'
+                mpc = 2
+                score = 4
+
+            if bmi >= 30 and bmi <= 34.9:
+                result = 'Obesity class 1'
+                mpc = 3
+                score = 3
+            
+            if bmi >= 35 and bmi <= 40:
+                result = 'Obesity class 2'
+                mpc = 4
+                score = 2
+            
+            if bmi > 40 or bmi < 18.5:
+                result = 'Extreme obesity/Underweight'
+                mpc = 5
+                score = 1
+       
+        if gender == 'Female':
+            if bmi >= 31 and bmi <= 32:
+                result = 'Normal'
+                mpc = 1
+                score = 5
+
+            if bmi >= 32.5 and bmi <= 34.9:
+                result = 'Overweight'
+                mpc = 2
+                score = 4
+
+            if bmi >= 35 and bmi <= 40:
+                result = 'Obesity class 1'
+                mpc = 3
+                score = 3
+            
+            if bmi >= 40 or bmi <= 25 or bmi <= 30.5:
+                result = 'Obesity class 2'
+                mpc = 4
+                score = 2
+            
+            if bmi < 18.5:
+                result = 'Underweight'
+                mpc = 5
+                score = 1
+    else:
+        if bmi >= 18.5 and bmi <= 24.9:
+            result = 'Normal'
+            mpc = 1
+            score = 5
+
+        if bmi >= 25 and bmi <= 29.9:
+            result = 'Overweight'
+            mpc = 2
+            score = 4
+
+        if bmi >= 30 and bmi <= 34.9:
+            result = 'Obesity class 1'
+            mpc = 3
+            score = 3
         
-                if bmi >= 25 and bmi <= 29.9:
-                    result = 'Overweight'
-                    mpc = 2
-                    score = 4
-                   
-                if bmi >= 30 and bmi <= 34.9:
-                    result = 'Obesity class 1'
-                    mpc = 3
-                    score = 3
-                    st.warning(result)        
-                if bmi >= 35 and bmi <= 40:
-                    result = 'Obesity class 2'
-                    mpc = 4
-                    score = 2
-                    st.error(result)
-                if bmi > 40 or bmi < 18.5:
-                    result = 'Extreme obesity/Underweight'
-                    mpc = 5
-                    score = 1
-                    st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    description = result
-                    scale = mpc
-                    save_to_db(conn,patient_id,reading_date,bmi,scale,score,description)
-                    st.success("Reading saved")
+        if bmi >= 35 and bmi <= 40:
+            result = 'Obesity class 2'
+            mpc = 4
+            score = 2
+        
+        if bmi > 40 or bmi < 18.5:
+            result = 'Extreme obesity/Underweight'
+            mpc = 5
+            score = 1  
+            
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,bmi,special,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")

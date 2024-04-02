@@ -1,3 +1,6 @@
+import pandas as pd 
+from datetime import datetime
+
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
     sql = "SELECT reading_date,dbp, sbp, mean_abp, description FROM bp_reading WHERE patient_id = " + str(patient_id) + ""
@@ -221,67 +224,186 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading = average_score/divider
         reading_scores = average_score_scores/divider
     return reading_scores, reading
-    
-def save_to_db(conn,patient_id,reading_date,dbp,sbp,mean_abp,scale,score,description,mpc):
-    conn.execute(f'''
-            INSERT INTO bp_reading (patient_id,reading_date,dbp,sbp,mean_abp,scale,score,description,mpc) 
-            VALUES 
-            ('{patient_id}','{reading_date}','{dbp}','{sbp}','{mean_abp}','{scale}','{score}','{description}','{mpc}')
-            ''')
+       
+def save_to_db(conn,patient_id,reading_date,dbp,sbp,mean_abp,special,scale,score,description,data_id):
+    cursor=conn.cursor()
+    if data_id:
+        sql_update_query = """UPDATE bp_reading set reading_date = ?, dbp=?, sbp=?, mean_abp=?, special_case=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(dbp),str(sbp),str(mean_abp),str(special),str(scale),str(score),str(description),str(data_id))
+        cursor.execute(sql_update_query, data)
+    else:
+        conn.execute(f'''
+                INSERT INTO bp_reading (
+                patient_id, reading_date, dbp,sbp,mean_abp, special_case, scale, score, description
+                ) 
+                VALUES 
+                ('{patient_id}','{reading_date}','{dbp}','{sbp}','{mean_abp}','{special}','{scale}','{score}','{description}')
+                ''')
     conn.commit()    
     
-def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
-    ##modal widgets##
-    modal = widgets.create_modal_widget("Capture blood pressure reading","blood_pressure",50,600)
-    open_modal = st.button("Capture blood pressure reading","blood_pressure")
+def delete_readings(conn,st,data_id):
+    cursor = conn.cursor()
+    sql_delete_query = "DELETE FROM bp_reading where id = " + str(data_id)
+    cursor.execute(sql_delete_query)
+    conn.commit()
+    st.success('Reading of record ' + str(data_id) + ' deleted.')
     
-    if open_modal:
-        modal.open()
-        
-    if modal.is_open():
+def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):   
+   return
+   
+def get_readings_for_edit(st,conn,patient_id):
+    cursor = conn.cursor()
+    sql = "SELECT reading_date, sbp, dbp, special_case, mean_abp, score, scale, description,id FROM bp_reading WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    cursor=conn.cursor()
+    cursor.execute(sql)
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Systolic Reading','Diastolic Reading','Is Special Case?','Mean Arterial Reading','Score','Scale','Description','ID'])
+    df['Reading Date'] = pd.to_datetime(df['Reading Date'])
+    edited_df = st.data_editor(
+    df,
+    key="bp_df",
+    num_rows="dynamic",
+    disabled=["ID","Score","Description","Mean Arterial Reading"],
+    column_config={
+        "Reading Date": st.column_config.DateColumn(
+            format="YYYY-MM-DD",
+            step=1,
+            required=True,
+        ),
+        "Systolic Reading": st.column_config.NumberColumn(
+            required=True,
+        ),
+        "Diastolic Reading": st.column_config.NumberColumn(
+            required=True,
+        ),
+        "Is Special Case?": st.column_config.CheckboxColumn(
+            required=True,
+        ),
        
-        with modal.container():
-            result = ''
-            mpc = ''
-            score = ''
-            scale = ''
-            if (age>70):
-                st.write("Special case")
-            reading_date = st.date_input("Reading date",format="YYYY-MM-DD",key="bp-date")
-            systolic = st.number_input("Systolic in mm Hg",key="bp-systolic")
-            diastolic = st.number_input("Diastolic in mm Hg",key="bp-diastolic")
-           
-            if st.button('Submit reading',key="bp-submit"):
-                if (systolic >= 100 and systolic <= 129) or (diastolic >= 60 and diastolic < 84):
-                    result = 'Normal'
-                    mpc = 1
-                    score = 5
-        
-                if (systolic >= 130 and systolic <= 139) or (diastolic >= 85 and diastolic < 89):
-                    result = 'High normal'
-                    mpc = 2
-                    score = 4
-                   
-                if (systolic >= 140 and systolic <= 159) or (diastolic >= 90 and diastolic < 99):
-                    result = 'Grade 1'
-                    mpc = 3
-                    score = 3
-                    st.warning(result)        
-                if (systolic >= 160 and systolic <= 179) or (diastolic >= 100 and diastolic < 109):
-                    result = 'Grade 2'
-                    mpc = 4
-                    score = 2
-                    st.error(result)
-                if (systolic >= 180 and diastolic >= 110) or (systolic < 100 and diastolic < 60):
-                    result = 'Grade 3/urgency'
-                    mpc = 5
-                    score = 1
-                    st.error(result)
-                if not result:
-                    st.error('You have not entered valid inputs, please try again')
-                else:
-                    description = result
-                    scale = mpc
-                    mean_abp = (2*diastolic + systolic)/3
-                    save_to_db(conn,patient_id,reading_date,diastolic,systolic,mean_abp,scale,score,description,mpc)
-                    st.success("Reading saved")
+    },
+    hide_index=True,
+    use_container_width=True
+    )
+    st.write('In order to add or update a BP record, enter/alter Reading Date, Systolic Reading, Diastolic Reading, and specify whether it is a Special Case or not. The system will automatically fill in the values for the other columns.')    
+    if st.button('Save Changes',key="bp_btn"):
+        ###Process edited content
+        edited_rows = st.session_state["bp_df"].get("edited_rows")
+        edited_items_list = edited_rows.items()
+        for index,item in edited_items_list:
+            data_id = df.loc[index, 'ID']
+            reading_date = df.loc[index, 'Reading Date']
+            sbp = df.loc[index, 'Systolic Reading']
+            dbp = df.loc[index, 'Diastolic Reading']
+            special = df.loc[index, 'Is Special Case?'] 
+            #check what has changed
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Systolic Reading' in item:
+                if sbp != item['Systolic Reading']:
+                    sbp = item['Systolic Reading']
+            if  'Diastolic Reading' in item:
+                if dbp != item['Diastolic Reading']:
+                    dbp = item['Diastolic Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            save_readings(conn,st,0,sbp,dbp,reading_date,special,index+1,data_id)
+        ##New Records
+        added_rows = st.session_state["bp_df"].get("added_rows")
+        index = 0
+        for item in added_rows:
+            index = index+1
+            reading_date = sbp = dbp = special = ''
+            #check what has been added
+            if 'Reading Date' in item:
+                if reading_date != item['Reading Date']:
+                    reading_date = item['Reading Date']
+            if  'Systolic Reading' in item:
+                if sbp != item['Systolic Reading']:
+                    sbp = item['Systolic Reading']
+            if  'Diastolic Reading' in item:
+                if dbp != item['Diastolic Reading']:
+                    dbp = item['Diastolic Reading']
+            if 'Is Special Case?' in item:
+                if special != item['Is Special Case?']:
+                    special = item['Is Special Case?']
+            if reading_date and sbp and dbp:
+                save_readings(conn,st,patient_id,sbp,dbp,reading_date,special,index)
+                
+        ##Delete Records
+        deleted_rows = st.session_state["bp_df"].get("deleted_rows")
+        index = 0
+        for item in deleted_rows:
+            data_id = df.loc[item, 'ID']
+            delete_readings(conn,st,data_id)
+   
+def save_readings(conn,st,patient_id,systolic,diastolic,reading_date,special,record,data_id=''):
+    result = ''
+    if special:
+        if (systolic >= 100 and systolic < 140) or (diastolic >= 60 and diastolic <= 90):
+            result = 'Normal'
+            mpc = 1
+            score = 5
+
+        if (systolic >= 140 and systolic <= 150) or (diastolic >= 91 and diastolic < 95):
+            result = 'High normal'
+            mpc = 2
+            score = 4
+
+        if (systolic >= 151 and systolic <= 160) or (diastolic >= 95 and diastolic < 100):
+            result = 'Grade 1'
+            mpc = 3
+            score = 3
+                
+        if (systolic >= 161 and systolic <= 179) or (diastolic >= 100 and diastolic < 109):
+            result = 'Grade 2'
+            mpc = 4
+            score = 2
+        if (systolic >= 180 or diastolic >= 110) or (systolic < 100 or diastolic < 60):
+            result = 'Grade 3/urgency'
+            mpc = 5
+            score = 1
+    else:
+        if (systolic >= 100 and systolic <= 129) or (diastolic >= 60 and diastolic < 84):
+            result = 'Normal'
+            mpc = 1
+            score = 5
+
+        if (systolic >= 130 and systolic <= 139) or (diastolic >= 85 and diastolic < 89):
+            result = 'High normal'
+            mpc = 2
+            score = 4
+
+        if (systolic >= 140 and systolic <= 159) or (diastolic >= 90 and diastolic < 99):
+            result = 'Grade 1'
+            mpc = 3
+            score = 3
+                
+        if (systolic >= 160 and systolic <= 179) or (diastolic >= 100 and diastolic < 109):
+            result = 'Grade 2'
+            mpc = 4
+            score = 2
+        if (systolic >= 180 or diastolic >= 110) or (systolic < 100 or diastolic < 60):
+            result = 'Grade 3/urgency'
+            mpc = 5
+            score = 1
+            
+    if not result:
+        if data_id:
+            st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
+        else:
+            st.error('New record failed to save. You have not entered valid inputs for new record ' + str(record) +'. Please try again.')
+    else:
+        description = result
+        scale = mpc
+        mean_abp = int((2*diastolic + systolic)/3)
+        if data_id:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d %H:%M:%S')
+        else:
+            reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
+        reading_date = reading_date.strftime('%Y-%m-%d')
+        save_to_db(conn,patient_id,reading_date,diastolic,systolic,mean_abp,special,scale,score,description,data_id)
+        if data_id:
+            st.success("Updated readings for record " + str(record) + " saved.")
+        else:
+            st.success("New readings for record " + str(record) + " saved.")
