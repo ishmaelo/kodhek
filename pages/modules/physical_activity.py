@@ -1,5 +1,6 @@
 import pandas as pd 
 from datetime import datetime
+import math
 
 def get_readings_for_display(conn,patient_id,start_date,end_date):
     cursor = conn.cursor()
@@ -243,19 +244,19 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
     return reading_scores, reading
     
-def save_to_db(conn,patient_id,reading_date,reading,scale,score,description,data_id):
+def save_to_db(conn,patient_id,reading_date,reading,total,percentage,scale,score,description,data_id):
     cursor=conn.cursor()
     if data_id:
-        sql_update_query = """UPDATE physical_activity set reading_date = ?,reading=?, scale=?, score=?, description=? where id = ?"""
-        data = (str(reading_date),str(reading),str(scale),str(score),str(description),str(data_id))
+        sql_update_query = """UPDATE physical_activity set reading_date = ?,reading=?, total=?, percentage=?,  scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(reading),str(total),str(percentage),str(scale),str(score),str(description),str(data_id))
         cursor.execute(sql_update_query, data)
     else:
         conn.execute(f'''
                 INSERT INTO physical_activity (
-                patient_id, reading_date, reading, scale, score, description
+                patient_id, reading_date, reading, total, percentage, scale, score, description
                 ) 
                 VALUES 
-                ('{patient_id}','{reading_date}','{reading}','{scale}','{score}','{description}')
+                ('{patient_id}','{reading_date}','{reading}','{total}','{percentage}','{scale}','{score}','{description}')
                 ''')
     conn.commit()    
     
@@ -271,16 +272,16 @@ def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):
    
 def get_readings_for_edit(st,conn,patient_id):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading, score, scale, description,id FROM physical_activity WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    sql = "SELECT reading_date,reading, total, percentage, score, scale, description,id FROM physical_activity WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
     cursor=conn.cursor()
     cursor.execute(sql)
-    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','MET min/week','Score','Scale','Description','ID'])
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','MET min/week','Total MET min/week','MET min/week %','Score','Scale','Description','ID'])
     df['Reading Date'] = pd.to_datetime(df['Reading Date'])
     edited_df = st.data_editor(
     df,
     key="physical_activity_df",
     num_rows="dynamic",
-    disabled=["ID","Score","Description"],
+    disabled=['MET min/week %','Score','Scale','Description','ID'],
     column_config={
         "Reading Date": st.column_config.DateColumn(
             format="YYYY-MM-DD",
@@ -292,7 +293,7 @@ def get_readings_for_edit(st,conn,patient_id):
     hide_index=True,
     use_container_width=True
     )
-    st.write('In order to add or update an Physical Activity record, enter/alter Reading Date, and the MET min/week. The system will automatically fill in the values for the other columns.')    
+    st.write('In order to add or update an Physical Activity record, enter/alter Reading Date, the MET min/week, Total MET min/week. The system will automatically fill in the values for the other columns.')    
     if st.button('Save Changes',key="bp_btn"):
         ###Process edited content
         edited_rows = st.session_state["physical_activity_df"].get("edited_rows")
@@ -301,7 +302,7 @@ def get_readings_for_edit(st,conn,patient_id):
             data_id = df.loc[index, 'ID']
             reading_date = df.loc[index, 'Reading Date']
             test = df.loc[index, 'MET min/week']
-                    
+            total = df.loc[index, 'Total MET min/week']        
             #check what has changed
             if 'Reading Date' in item:
                 if reading_date != item['Reading Date']:
@@ -309,13 +310,16 @@ def get_readings_for_edit(st,conn,patient_id):
             if  'MET min/week' in item:
                 if test != item['MET min/week']:
                     test = item['MET min/week']
-            save_readings(conn,st,0,test,reading_date,index+1,data_id)
+            if  'Total MET min/week' in item:
+                if total != item['Total MET min/week']:
+                    total = item['Total MET min/week']
+            save_readings(conn,st,0,test,total,reading_date,index+1,data_id)
         ##New Records
         added_rows = st.session_state["physical_activity_df"].get("added_rows")
         index = 0
         for item in added_rows:
             index = index+1
-            reading_date = test = ''
+            reading_date = test = total = ''
             #check what has been added
             if 'Reading Date' in item:
                 if reading_date != item['Reading Date']:
@@ -323,8 +327,11 @@ def get_readings_for_edit(st,conn,patient_id):
             if  'MET min/week' in item:
                 if test != item['MET min/week']:
                     test = item['MET min/week']
+            if  'Total MET min/week' in item:
+                if total != item['Total MET min/week']:
+                    total = item['Total MET min/week']
             if test:
-                save_readings(conn,st,patient_id,test,reading_date,index)
+                save_readings(conn,st,patient_id,test,total,reading_date,index)
                 
         ##Delete Records
         deleted_rows = st.session_state["physical_activity_df"].get("deleted_rows")
@@ -333,32 +340,36 @@ def get_readings_for_edit(st,conn,patient_id):
             data_id = df.loc[item, 'ID']
             delete_readings(conn,st,data_id)
    
-def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
+def save_readings(conn,st,patient_id,test,total,reading_date,record,data_id=''):
     result = ''
-    if test >500:
+    total = int(total)
+    percentage = math.ceil((test/total)*100)
+    
+    if percentage >80:
         result = 'Optimal'
         mpc = 1
         score = 5
         
-    if test >= 400 and test <=500:
+    if percentage >= 61 and percentage <=80:
         result = 'Good'
         mpc = 2
         score = 4
        
-    if test >= 300 and test <= 399:
+    if percentage >= 41 and percentage <=60:
         result = 'Average'
         mpc = 3
         score = 3
             
-    if test >= 200 and test <=299:
+    if percentage >= 21 and percentage <=40:
         result = 'Fair'
         mpc = 4
         score = 2
        
-    if test <200:
+    if percentage <=20:
         result = 'Poor'
         mpc = 5
         score = 1
+        
     if not result:
         if data_id:
             st.error('Updates failed. You have not entered valid inputs for record ' + str(record) +' to be updated. Please try again.')
@@ -372,7 +383,7 @@ def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
         else:
             reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
         reading_date = reading_date.strftime('%Y-%m-%d')
-        save_to_db(conn,patient_id,reading_date,test,scale,score,description,data_id)
+        save_to_db(conn,patient_id,reading_date,test,total,percentage,scale,score,description,data_id)
         if data_id:
             st.success("Updated readings for record " + str(record) + " saved.")
         else:
