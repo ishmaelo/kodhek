@@ -177,7 +177,7 @@ def readings_on_table_display(readings,st,date_range):
     with date:
        st.write("**Date**")
     with bgm:
-       st.write("**Sensations felt out of 5**")
+       st.write("**Total Out Of**")
     with description:
        st.write("**Description**")
     i = 0
@@ -243,19 +243,19 @@ def initial_diagnosis_correlation_readings_more(conn, patient_id, old_date_str,n
         reading_scores = average_score_scores/divider
     return reading_scores, reading
     
-def save_to_db(conn,patient_id,reading_date,reading,scale,score,description,data_id):
+def save_to_db(conn,patient_id,reading_date,reading,total,scale,score,description,data_id):
     cursor=conn.cursor()
     if data_id:
-        sql_update_query = """UPDATE monofilament set reading_date = ?,reading=?, scale=?, score=?, description=? where id = ?"""
-        data = (str(reading_date),str(reading),str(scale),str(score),str(description),str(data_id))
+        sql_update_query = """UPDATE monofilament set reading_date = ?,reading=?, total_out_of=?, scale=?, score=?, description=? where id = ?"""
+        data = (str(reading_date),str(reading),str(total),str(scale),str(score),str(description),str(data_id))
         cursor.execute(sql_update_query, data)
     else:
         conn.execute(f'''
                 INSERT INTO monofilament (
-                patient_id, reading_date, reading, scale, score, description
+                patient_id, reading_date, reading, total_out_of, scale, score, description
                 ) 
                 VALUES 
-                ('{patient_id}','{reading_date}','{reading}','{scale}','{score}','{description}')
+                ('{patient_id}','{reading_date}','{reading}','{total}','{scale}','{score}','{description}')
                 ''')
     conn.commit()    
     
@@ -271,10 +271,10 @@ def set_data_capture_form(conn,patient_id,st,widgets,components,age=''):
    
 def get_readings_for_edit(st,conn,patient_id):
     cursor = conn.cursor()
-    sql = "SELECT reading_date,reading, score, scale, description,id FROM monofilament WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
+    sql = "SELECT reading_date, reading, total_out_of, score, scale, description,id FROM monofilament WHERE patient_id = " + str(patient_id) + " ORDER BY id ASC"
     cursor=conn.cursor()
     cursor.execute(sql)
-    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Monofilament Test Results','Score','Scale','Description','ID'])
+    df = pd.DataFrame(cursor.fetchall(),columns=['Reading Date','Monofilament Test Result','Total Out Of','Score','Scale','Description','ID'])
     df['Reading Date'] = pd.to_datetime(df['Reading Date'])
     edited_df = st.data_editor(
     df,
@@ -287,10 +287,13 @@ def get_readings_for_edit(st,conn,patient_id):
             step=1,
             required=True,
         ),
-        "Monofilament Test Results": st.column_config.SelectboxColumn(
-            options=["5 sensations felt out of 5", "4 sensations felt out of 5", "3 sensations felt out of 5", "2 sensations felt out of 5", "1 sensations felt out of 5"],
+        "Monofilament Test Result": st.column_config.NumberColumn(
             required=True,
         ),
+         "Total Out Of": st.column_config.NumberColumn(
+            required=True,
+        ),
+      
        
     },
     hide_index=True,
@@ -304,31 +307,37 @@ def get_readings_for_edit(st,conn,patient_id):
         for index,item in edited_items_list:
             data_id = df.loc[index, 'ID']
             reading_date = df.loc[index, 'Reading Date']
-            test = df.loc[index, 'Monofilament Test Results']
-                    
+            test = df.loc[index, 'Monofilament Test Result']
+            total = df.loc[index, 'Total Out Of']        
             #check what has changed
             if 'Reading Date' in item:
                 if reading_date != item['Reading Date']:
                     reading_date = item['Reading Date']
+            if 'Total Out Of' in item:
+                if total != item['Total Out Of']:
+                    total = item['Total Out Of']
             if  'Monofilament Test Results' in item:
                 if test != item['Monofilament Test Results']:
                     test = item['Monofilament Test Results']
-            save_readings(conn,st,0,test,reading_date,index+1,data_id)
+            save_readings(conn,st,0,test,total,reading_date,index+1,data_id)
         ##New Records
         added_rows = st.session_state["monofilament_df"].get("added_rows")
         index = 0
         for item in added_rows:
             index = index+1
-            reading_date = test = ''
+            reading_date = test = total = ''
             #check what has been added
             if 'Reading Date' in item:
                 if reading_date != item['Reading Date']:
                     reading_date = item['Reading Date']
+            if 'Total Out Of' in item:
+                if total != item['Total Out Of']:
+                    total = item['Total Out Of']
             if  'Monofilament Test Results' in item:
                 if test != item['Monofilament Test Results']:
                     test = item['Monofilament Test Results']
-            if test:
-                save_readings(conn,st,patient_id,test,reading_date,index)
+            if test and total:
+                save_readings(conn,st,patient_id,test,total,reading_date,index)
                 
         ##Delete Records
         deleted_rows = st.session_state["monofilament_df"].get("deleted_rows")
@@ -337,29 +346,30 @@ def get_readings_for_edit(st,conn,patient_id):
             data_id = df.loc[item, 'ID']
             delete_readings(conn,st,data_id)
    
-def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
+def save_readings(conn,st,patient_id,test,total,reading_date,record,data_id=''):
     result = ''
-    if test == '5 sensations felt out of 5':
+    rate = (test/total) * 100
+    if rate >= 80:
         result = 'Normal'
         mpc = 1
         score = 5
         
-    if test == '4 sensations felt out of 5':
+    if rate >= 60 and rate <= 79:
         result = 'Mild'
         mpc = 2
         score = 4
        
-    if test == '3 sensations felt out of 5':
+    if rate >= 40 and rate <= 59:
         result = 'Moderate'
         mpc = 3
         score = 3
             
-    if test == '2 sensations felt out of 5':
+    if rate >= 20 and rate <= 39:
         result = 'Severe'
         mpc = 4
         score = 2
        
-    if test == '1 sensations felt out of 5':
+    if rate <= 19:
         result = 'Very severe'
         mpc = 5
         score = 1
@@ -376,7 +386,7 @@ def save_readings(conn,st,patient_id,test,reading_date,record,data_id=''):
         else:
             reading_date = datetime.strptime(str(reading_date), '%Y-%m-%d')
         reading_date = reading_date.strftime('%Y-%m-%d')
-        save_to_db(conn,patient_id,reading_date,test,scale,score,description,data_id)
+        save_to_db(conn,patient_id,reading_date,test,total,scale,score,description,data_id)
         if data_id:
             st.success("Updated readings for record " + str(record) + " saved.")
         else:
