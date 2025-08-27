@@ -26,7 +26,7 @@ import pages.modules.socioeconomic as socioeconomic
 
 
 conn = utility.get_database_connection() #database connection
-utility.set_title(st) #Title of the page
+##utility.set_title(st) #Title of the page
 
 
 ### display patient medical readings ###
