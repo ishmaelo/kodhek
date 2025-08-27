@@ -40,7 +40,7 @@ def display_patient(conn,patient):
     st.write("**Selected reading category: " + reading_option + "**")
     utility.load_data(st,conn,patient_id,reading_option)    
     
-    '''   
+      
     compute = 1
     with st.sidebar:
         st.markdown("<hr/>",unsafe_allow_html=True)
@@ -126,7 +126,7 @@ def display_patient(conn,patient):
     
     st.header("Corelation between HBA1C (dependent variable) and the other Care Targets")
     utility.target_correlations(conn, patient,pd,st)
-    '''
+    
  
 def display(conn,patient_id):
     display_patient(conn,utility.get_patient(conn,patient_id))
